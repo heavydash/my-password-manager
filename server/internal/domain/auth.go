@@ -2,6 +2,8 @@ package domain
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"gophkeeper/server/internal/ports"
 )
 
@@ -20,31 +22,60 @@ type AuthUseCase struct {
 }
 
 func NewAuthUseCase(authPort ports.AuthPort) *AuthUseCase {
+	if authPort == nil {
+		panic("auth cannot be nil")
+	}
 	return &AuthUseCase{authPort: authPort}
 }
 
 func (u *AuthUseCase) Register(ctx context.Context, email, password string) (string, error) {
-	user := User{
+	if email == "" {
+		return "", errors.New("email is required")
+	}
+	// Создаем чистую доменную сущность
+	domainUser := User{
 		Email:    email,
 		Provider: "password",
 	}
 	if password != "" {
-		user.PasswordHash = password
+		domainUser.PasswordHash = password
 	}
 
 	// Преобразуем domain.User в ports.User
 	portUser := ports.User{
-		Email:        user.Email,
-		PasswordHash: user.PasswordHash,
-		Provider:     user.Provider,
-		ProviderID:   user.ProviderID,
+		Email:        domainUser.Email,
+		PasswordHash: domainUser.PasswordHash,
+		Provider:     domainUser.Provider,
+		ProviderID:   domainUser.ProviderID,
 	}
 
-	return u.authPort.CreateUser(ctx, portUser)
+	userID, err := u.authPort.CreateUser(ctx, portUser)
+	if err != nil {
+		if errors.Is(err, ErrUserAlreadyExists) {
+			return "", ErrUserAlreadyExists
+		}
+		return "", fmt.Errorf("create user: %w", err)
+	}
+	return userID, nil
 }
 
 func (u *AuthUseCase) LoginPassword(ctx context.Context, email, password string) (string, error) {
-	return u.authPort.AuthenticatePassword(ctx, email, password)
+	// Валидация входных данных
+	if email == "" || password == "" {
+		return "", errors.New("email or password is required")
+	}
+
+	// Генерация токена JWT
+	token, err := u.authPort.AuthenticatePassword(ctx, email, password)
+	if err != nil {
+		if errors.Is(err, ErrInvalidCredentials) ||
+			errors.Is(err, ErrUserNotFound) {
+			return "", ErrInvalidCredentials
+		}
+
+		return "", fmt.Errorf("authenticate password: %w", err)
+	}
+	return token, nil
 }
 
 func (u *AuthUseCase) LoginOAuth(ctx context.Context, provider, code string) (string, error) {
