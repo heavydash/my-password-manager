@@ -48,7 +48,7 @@ func AuthMiddleware(validateJWT JWTValidator) gin.HandlerFunc {
 		}
 		// Успешная валидация — сохраняем user_id в контексте Gin
 		// Теперь любой handler ниже по цепочке может достать его через c.Get("user_id")
-		c.Set("userID", userID)
+		c.Set("user_id", userID)
 
 		// Продолжаем выполнение следующего middleware / handler
 		c.Next()

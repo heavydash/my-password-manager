@@ -7,6 +7,7 @@ import (
 	"gophkeeper/server/internal/adapters/auth"
 	"gophkeeper/server/internal/adapters/protocol/rest/handler"
 	"gophkeeper/server/internal/adapters/protocol/rest/middleware"
+	"gophkeeper/server/internal/adapters/secret"
 	"gophkeeper/server/internal/adapters/storage/postgres"
 	"gophkeeper/server/internal/config"
 	"gophkeeper/server/internal/domain"
@@ -38,13 +39,21 @@ func main() {
 	log.Println("Successfully connected to database")
 
 	// Создаем Storage
-	storage := postgres.NewStorage(db)
+	userStorage := postgres.NewStorage(db)
+	secretStorage := postgres.NewSecretStorage()
 
 	// Создаем адаптеры
-	passwordAdapter := auth.NewPasswordAdapter(storage, cfg.JWT.Secret)
+	passwordAdapter := auth.NewPasswordAdapter(userStorage, cfg.JWT.Secret)
+	secretAdapter := secret.NewSecretAdapter(secretStorage)
+
+	// UseCases
 	authUserCase := domain.NewAuthUseCase(passwordAdapter)
+	secretUseCase := domain.NewSecretUseCase(secretAdapter)
+
+	_ = secretUseCase
 
 	log.Println("Auth User Case and password adapter initialized")
+	log.Println("Secret Use Case and secret adapter initialized")
 
 	// Настройка Gin
 	if gin.Mode() == gin.DebugMode {
@@ -65,6 +74,9 @@ func main() {
 	protect := r.Group("/")
 	protect.Use(middleware.AuthMiddleware(passwordAdapter.ValidateJWT))
 	protect.GET("/profile", handler.Profile())
+
+	protect.POST("/secrets", handler.CreateSecret(secretUseCase))
+	protect.GET("/secrets", handler.GetSecrets(secretUseCase))
 
 	// HTTP + pprof
 	srv := &http.Server{

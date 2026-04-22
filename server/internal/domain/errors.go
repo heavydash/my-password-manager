@@ -16,6 +16,9 @@ var (
 	ErrTokenInvalid = errors.New("invalid token")
 	ErrTokenExpired = errors.New("token expired")
 
+	// ErrInvalidinput -
+	ErrInvalidInput = errors.New("invalid input")
+
 	// Общие
 	ErrNotFound = errors.New("not found")
 	ErrInternal = errors.New("internal error")
