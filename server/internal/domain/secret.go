@@ -18,7 +18,7 @@ const (
 func NewSecret(userID string,
 	secretType string,
 	title string,
-	encryptedData []byte) (*ports.Secret, error) {
+	encryptedData string) (*ports.Secret, error) {
 	if userID == "" {
 		return nil, ErrInvalidInput
 	}

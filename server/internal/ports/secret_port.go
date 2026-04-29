@@ -10,7 +10,7 @@ type Secret struct {
 	UserID    string    `json:"user_id"`
 	Type      string    `json:"type"`
 	Title     string    `json:"title"`
-	Data      []byte    `json:"data"`
+	Data      string    `json:"data"`
 	Metadata  string    `json:"metadata"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -20,6 +20,7 @@ type Secret struct {
 type SecretPort interface {
 	Create(ctx context.Context, secret *Secret) (*Secret, error)
 	GetByUserID(ctx context.Context, userID string) ([]*Secret, error)
+	GetSecret(ctx context.Context, id, userID string) (*Secret, error)
 	Delete(ctx context.Context, userID, secretID string) error
 }
 
@@ -27,5 +28,6 @@ type SecretPort interface {
 type SecretStoragePort interface {
 	Create(ctx context.Context, secret *Secret) (*Secret, error)
 	GetByUserID(ctx context.Context, userID string) ([]*Secret, error)
+	GetSecret(ctx context.Context, id, userID string) (*Secret, error)
 	Delete(ctx context.Context, userID, secretID string) error
 }

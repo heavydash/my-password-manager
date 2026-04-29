@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"github.com/gin-gonic/gin"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"gophkeeper/server/internal/adapters/auth"
 	"gophkeeper/server/internal/adapters/protocol/rest/handler"
 	"gophkeeper/server/internal/adapters/protocol/rest/middleware"
@@ -11,6 +12,7 @@ import (
 	"gophkeeper/server/internal/adapters/storage/postgres"
 	"gophkeeper/server/internal/config"
 	"gophkeeper/server/internal/domain"
+	"gophkeeper/server/migrations"
 	"log"
 	"net/http"
 	"os"
@@ -37,6 +39,13 @@ func main() {
 		log.Fatalf("Failed to ping database: %v", err)
 	}
 	log.Println("Successfully connected to database")
+
+	// Запуск миграций
+	log.Println("running database migrations...")
+	if err := migrations.RunMigrations(cfg.Database.DSN); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
+	}
+	log.Println("migrations completed")
 
 	// Создаем Storage
 	userStorage := postgres.NewStorage(db)
@@ -77,6 +86,7 @@ func main() {
 
 	protect.POST("/secrets", handler.CreateSecret(secretUseCase))
 	protect.GET("/secrets", handler.GetSecrets(secretUseCase))
+	protect.GET("/secrets/:id", handler.GetSecret(secretUseCase))
 
 	// HTTP + pprof
 	srv := &http.Server{

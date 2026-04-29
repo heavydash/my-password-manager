@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"errors"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"gophkeeper/server/internal/domain"
 	"net/http"
@@ -10,9 +10,9 @@ import (
 // CreateSecret — создание нового секрета
 func CreateSecret(uc *domain.SecretUseCase) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		fmt.Println("=== CREATE SECRET HANDLER CALLED ===")
 		// Получение UserID из middleware
 		userIDInterface, exists := c.Get("user_id")
-
 		if !exists {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "user not authenticated",
@@ -25,38 +25,36 @@ func CreateSecret(uc *domain.SecretUseCase) gin.HandlerFunc {
 			return
 		}
 
-		// Валидация данных
+		fmt.Printf("DEBUG: UserID = %s\n", userID)
+
+		// Простой binding без строгой валидации
 		var req struct {
-			Type     string `json:"type" binding:"required"`
-			Title    string `json:"title" binding:"required"`
-			Data     string `json:"data" binding:"required"` // зашифрованные данные в base64
+			Type     string `json:"type"`
+			Title    string `json:"title"`
+			Data     string `json:"data"`
 			Metadata string `json:"metadata"`
 		}
 
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
-		// Пока Data как строка base64, потом []byte
-		encryptedData := []byte(req.Data)
+		encryptedDataBase64 := req.Data
 
+		fmt.Printf("Data length = %d\n", len(encryptedDataBase64))
+
+		// Создаём секрет
 		secret, err := uc.CreateSecret(
 			c.Request.Context(),
 			userID,
 			req.Type,
 			req.Title,
-			encryptedData,
+			req.Data,
 		)
 		if err != nil {
-			if errors.Is(err, domain.ErrInvalidInput) {
-				c.JSON(http.StatusBadRequest, gin.H{
-					"error": "invalid input"})
-				return
-			}
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "internal server error"})
+			fmt.Printf("USECASE ERROR: %v\n", err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -92,5 +90,31 @@ func GetSecrets(uc *domain.SecretUseCase) gin.HandlerFunc {
 		c.JSON(http.StatusOK, gin.H{
 			"secrets": secrets,
 		})
+	}
+}
+
+func GetSecret(uc *domain.SecretUseCase) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		userID := c.GetString("user_id")
+
+		secret, err := uc.GetSecret(c.Request.Context(), id, userID)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "secret not found"})
+			return
+		}
+
+		resp := map[string]interface{}{
+			"id":         secret.ID,
+			"user_id":    secret.UserID,
+			"type":       secret.Type,
+			"title":      secret.Title,
+			"data":       secret.Data,
+			"metadata":   secret.Metadata,
+			"created_at": secret.CreatedAt,
+			"updated_at": secret.UpdatedAt,
+		}
+
+		c.JSON(http.StatusOK, resp)
 	}
 }

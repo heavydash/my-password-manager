@@ -59,23 +59,23 @@ func (u *AuthUseCase) Register(ctx context.Context, email, password string) (str
 	return userID, nil
 }
 
-func (u *AuthUseCase) LoginPassword(ctx context.Context, email, password string) (string, error) {
+func (u *AuthUseCase) LoginPassword(ctx context.Context, email, password string) (string, string, error) {
 	// Валидация входных данных
 	if email == "" || password == "" {
-		return "", errors.New("email or password is required")
+		return "", "", errors.New("email or password is required")
 	}
 
 	// Генерация токена JWT
-	token, err := u.authPort.AuthenticatePassword(ctx, email, password)
+	token, userID, err := u.authPort.AuthenticatePassword(ctx, email, password)
 	if err != nil {
 		if errors.Is(err, ErrInvalidCredentials) ||
 			errors.Is(err, ErrUserNotFound) {
-			return "", ErrInvalidCredentials
+			return "", "", ErrInvalidCredentials
 		}
 
-		return "", fmt.Errorf("authenticate password: %w", err)
+		return "", "", fmt.Errorf("authenticate password: %w", err)
 	}
-	return token, nil
+	return token, userID, nil
 }
 
 func (u *AuthUseCase) LoginOAuth(ctx context.Context, provider, code string) (string, error) {

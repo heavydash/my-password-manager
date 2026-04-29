@@ -20,20 +20,19 @@ func NewSecretUseCase(SecretPort ports.SecretPort) *SecretUseCase {
 }
 
 func (uc *SecretUseCase) CreateSecret(ctx context.Context, userID string, SecretType string,
-	title string, encryptedData []byte) (*ports.Secret, error) {
+	title string, encryptedDataBase64 string) (*ports.Secret, error) {
 
-	if userID == "" || title == "" || len(encryptedData) == 0 {
+	if userID == "" || title == "" || len(encryptedDataBase64) == 0 {
 		return nil, ErrInvalidInput
 	}
 
 	switch SecretType {
 	case "password", "note", "card", "ssh_key", "custom":
-	// разрешенные типы
 	default:
 		return nil, ErrInvalidInput
 	}
 
-	secret, err := NewSecret(userID, SecretType, title, encryptedData)
+	secret, err := NewSecret(userID, SecretType, title, encryptedDataBase64)
 	if err != nil {
 		return nil, err
 	}
@@ -58,6 +57,10 @@ func (uc *SecretUseCase) GetSecrets(ctx context.Context, userID string) ([]*port
 	}
 
 	return secrets, nil
+}
+
+func (uc *SecretUseCase) GetSecret(ctx context.Context, id, userID string) (*ports.Secret, error) {
+	return uc.secretPort.GetSecret(ctx, id, userID)
 }
 
 func (uc *SecretUseCase) DeleteSecret(ctx context.Context, userID, secretID string) error {

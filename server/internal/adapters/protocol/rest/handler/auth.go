@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	"gophkeeper/server/internal/domain"
+	"log"
 	"net/http"
 )
 
@@ -21,9 +22,14 @@ func Register(uc *domain.AuthUseCase) gin.HandlerFunc {
 			return
 		}
 
+		log.Printf("[REGISTER] Attempt for email: %s", req.Email)
+
 		// Вызываем UseCase
 		userID, err := uc.Register(c.Request.Context(), req.Email, req.Password)
 		if err != nil {
+
+			log.Printf("Registration failed: %v", err)
+
 			if errors.Is(err, domain.ErrUserAlreadyExists) {
 				c.JSON(http.StatusConflict, gin.H{"error:": "user with this email already exists"})
 				return
@@ -32,6 +38,7 @@ func Register(uc *domain.AuthUseCase) gin.HandlerFunc {
 			return
 		}
 
+		log.Printf("[REGISTER] Success for email: %s", req.Email)
 		// Успешный ответ
 		c.JSON(http.StatusCreated, gin.H{
 			"message": "user registered successfully",
@@ -54,7 +61,7 @@ func Login(uc *domain.AuthUseCase) gin.HandlerFunc {
 		}
 
 		// Вызываем UseCase
-		token, err := uc.LoginPassword(c.Request.Context(), req.Email, req.Password)
+		token, userID, err := uc.LoginPassword(c.Request.Context(), req.Email, req.Password)
 		if err != nil {
 			if errors.Is(err, domain.ErrInvalidCredentials) {
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
@@ -69,6 +76,7 @@ func Login(uc *domain.AuthUseCase) gin.HandlerFunc {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "login successfully",
 			"token":   token,
+			"userID":  userID,
 		})
 	}
 }

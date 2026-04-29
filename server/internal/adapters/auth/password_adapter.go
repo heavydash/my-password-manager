@@ -46,18 +46,23 @@ func (a *passwordAdapter) CreateUser(ctx context.Context, user ports.User) (stri
 	})
 }
 
-func (a *passwordAdapter) AuthenticatePassword(ctx context.Context, email, password string) (string, error) {
+func (a *passwordAdapter) AuthenticatePassword(ctx context.Context, email, password string) (string, string, error) {
 
 	user, err := a.storage.GetUserByEmail(ctx, email)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	if !a.checkPassword(password, user.PasswordHash) {
-		return "", domain.ErrInvalidCredentials
+		return "", "", domain.ErrInvalidCredentials
 	}
 
-	return a.generateJWT(user.ID)
+	token, err := a.generateJWT(user.ID)
+	if err != nil {
+		return "", "", err
+	}
+
+	return token, user.ID, nil
 }
 
 func (a *passwordAdapter) AuthenticateOAuth(ctx context.Context, provider, code string) (string, error) {
@@ -94,7 +99,11 @@ func (a *passwordAdapter) generateJWT(userID string) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(a.jwtSecret)
+	tokenString, err := token.SignedString(a.jwtSecret)
+	if err != nil {
+		return "", fmt.Errorf("sign token: %w", err)
+	}
+	return tokenString, nil
 }
 
 func (a *passwordAdapter) ValidateJWT(tokenString string) (string, error) {

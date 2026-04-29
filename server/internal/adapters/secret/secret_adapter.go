@@ -47,6 +47,10 @@ func (a *SecretAdapter) GetByUserID(ctx context.Context, userID string) ([]*port
 	return secrets, nil
 }
 
+func (a *SecretAdapter) GetSecret(ctx context.Context, id, userID string) (*ports.Secret, error) {
+	return a.storage.GetSecret(ctx, id, userID)
+}
+
 func (a *SecretAdapter) Delete(ctx context.Context, userID, secretID string) error {
 	if userID == "" || secretID == "" {
 		return domain.ErrInvalidInput
