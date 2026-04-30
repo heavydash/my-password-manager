@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"fmt"
 	"gophkeeper/server/internal/ports"
 	"time"
 )
@@ -15,10 +16,7 @@ const (
 	SecretTypeCustom   SecretType = "custom"
 )
 
-func NewSecret(userID string,
-	secretType string,
-	title string,
-	encryptedData string) (*ports.Secret, error) {
+func NewSecret(userID string, secretType SecretType, title string, encryptedData string) (*ports.Secret, error) {
 	if userID == "" {
 		return nil, ErrInvalidInput
 	}
@@ -31,12 +29,20 @@ func NewSecret(userID string,
 		return nil, ErrInvalidInput
 	}
 
+	// Валидация типа
+	switch secretType {
+	case SecretTypePassword, SecretTypeNote, SecretTypeCard, SecretTypeSSHKey, SecretTypeCustom:
+		// разрешённые типы
+	default:
+		return nil, fmt.Errorf("unknown secret type: %s", secretType)
+	}
+
 	now := time.Now()
 
 	return &ports.Secret{
 		ID:        generateID(),
 		UserID:    userID,
-		Type:      secretType,
+		Type:      string(secretType),
 		Title:     title,
 		Data:      encryptedData,
 		Metadata:  "",

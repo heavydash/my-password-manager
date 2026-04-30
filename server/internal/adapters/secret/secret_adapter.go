@@ -4,19 +4,25 @@ import (
 	"context"
 	"fmt"
 	"gophkeeper/server/internal/domain"
+	"gophkeeper/server/internal/logger"
 	"gophkeeper/server/internal/ports"
 )
 
 type SecretAdapter struct {
 	storage ports.SecretStoragePort
+	logger  logger.Logger
 }
 
-func NewSecretAdapter(storage ports.SecretStoragePort) *SecretAdapter {
+func NewSecretAdapter(storage ports.SecretStoragePort, log logger.Logger) *SecretAdapter {
 	if storage == nil {
 		panic("storage is nil")
 	}
+	if log == nil {
+		panic("logger is nil")
+	}
 	return &SecretAdapter{
 		storage: storage,
+		logger:  log,
 	}
 }
 

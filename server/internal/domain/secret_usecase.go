@@ -19,7 +19,7 @@ func NewSecretUseCase(SecretPort ports.SecretPort) *SecretUseCase {
 	}
 }
 
-func (uc *SecretUseCase) CreateSecret(ctx context.Context, userID string, SecretType string,
+func (uc *SecretUseCase) CreateSecret(ctx context.Context, userID string, SecretType SecretType,
 	title string, encryptedDataBase64 string) (*ports.Secret, error) {
 
 	if userID == "" || title == "" || len(encryptedDataBase64) == 0 {
