@@ -7,15 +7,17 @@ import (
 )
 
 type SecretUseCase struct {
-	secretPort ports.SecretPort
+	secretPort     ports.SecretPort
+	TokenValidator TokenValidator
 }
 
-func NewSecretUseCase(SecretPort ports.SecretPort) *SecretUseCase {
+func NewSecretUseCase(SecretPort ports.SecretPort, validator TokenValidator) *SecretUseCase {
 	if SecretPort == nil {
 		panic("secret port is nil")
 	}
 	return &SecretUseCase{
-		secretPort: SecretPort,
+		secretPort:     SecretPort,
+		TokenValidator: validator,
 	}
 }
 
@@ -75,4 +77,8 @@ func (uc *SecretUseCase) DeleteSecret(ctx context.Context, userID, secretID stri
 	}
 
 	return nil
+}
+
+func (uc *SecretUseCase) GetTokenValidator() TokenValidator {
+	return uc.TokenValidator
 }

@@ -8,6 +8,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"go.uber.org/zap"
 	"gophkeeper/server/internal/adapters/auth"
+	"gophkeeper/server/internal/adapters/protocol/grpc"
 	"gophkeeper/server/internal/adapters/protocol/rest/handler"
 	"gophkeeper/server/internal/adapters/protocol/rest/middleware"
 	"gophkeeper/server/internal/adapters/secret"
@@ -98,7 +99,9 @@ func main() {
 
 	// UseCases
 	authUserCase := domain.NewAuthUseCase(passwordAdapter, log)
-	secretUseCase := domain.NewSecretUseCase(secretAdapter)
+	secretUseCase := domain.NewSecretUseCase(secretAdapter, domain.JWTValidatorAdapter{
+		ValidateFunc: passwordAdapter.ValidateJWT,
+	})
 
 	log.Info("All layers initialized successfully")
 
@@ -162,6 +165,20 @@ func main() {
 			log.Warn("pprof server stopped", zap.Error(err))
 		}
 	}()
+
+	grpcAddr := ":" + cfg.Server.GRPCPort
+	grpcServer := grpc.NewServer(authUserCase, secretUseCase, log)
+
+	go func() {
+		if err := grpcServer.Start(grpcAddr); err != nil {
+			log.Error("gRPC server failed", zap.Error(err))
+		}
+	}()
+
+	log.Info("gRPC server started",
+		zap.String("address", grpcAddr),
+		zap.String("url", "http://localhost"+grpcAddr),
+	)
 
 	// Graceful shutdown
 	quit := make(chan os.Signal, 1)

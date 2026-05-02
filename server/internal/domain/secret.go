@@ -8,6 +8,15 @@ import (
 
 type SecretType string
 
+type TokenValidator interface {
+	ValidateToken(token string) (string, error)
+}
+
+// JWTValidatorAdapter — адаптер для приведения
+type JWTValidatorAdapter struct {
+	ValidateFunc func(token string) (string, error)
+}
+
 const (
 	SecretTypePassword SecretType = "password"
 	SecretTypeNote     SecretType = "note"
@@ -53,4 +62,8 @@ func NewSecret(userID string, secretType SecretType, title string, encryptedData
 
 func generateID() string {
 	return "" + time.Now().UTC().Format("20060102150405")
+}
+
+func (a JWTValidatorAdapter) ValidateToken(token string) (string, error) {
+	return a.ValidateFunc(token)
 }

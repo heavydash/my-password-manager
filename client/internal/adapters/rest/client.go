@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 )
 
@@ -242,11 +241,18 @@ func (c *Client) GetSecret(id string) (map[string]interface{}, error) {
 	return result, nil
 }
 
-func (c *Client) GetSecretRaw(id string) ([]byte, error) {
-	req, err := http.NewRequest(http.MethodGet, c.baseURL+"/secrets/"+id+"/raw", nil)
-	if err != nil {
-		return nil, err
+func (c *Client) DeleteSecret(id string) error {
+
+	if id == "" {
+		return fmt.Errorf("secret id is required")
 	}
+
+	req, err := http.NewRequest(http.MethodDelete, c.baseURL+"/secrets/"+id, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
 
 	if c.Token != "" {
 		req.Header.Set("Authorization", "Bearer "+c.Token)
@@ -254,13 +260,13 @@ func (c *Client) GetSecretRaw(id string) ([]byte, error) {
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("server returned status: %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("server returned status: %d", resp.StatusCode)
 	}
 
-	return io.ReadAll(resp.Body)
+	return nil
 }

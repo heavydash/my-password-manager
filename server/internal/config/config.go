@@ -21,9 +21,10 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Port  string
-	Env   string
-	Debug bool
+	Port     string
+	GRPCPort string
+	Env      string
+	Debug    bool
 }
 
 type DatabaseConfig struct {
@@ -71,9 +72,10 @@ func New() (*Config, error) {
 func defaultConfig() *Config {
 	return &Config{
 		Server: ServerConfig{
-			Port:  "8080",
-			Env:   "development",
-			Debug: false,
+			Port:     "8080",
+			GRPCPort: "9090",
+			Env:      "development",
+			Debug:    false,
 		},
 		Database: DatabaseConfig{
 			DSN: "postgres://postgres:supersecretpassword123@localhost:5433/gophkeeper?sslmode=disable",
@@ -102,6 +104,9 @@ func loadDotEnv() {
 func overwriteFromEnv(cfg *Config) {
 	if v := os.Getenv("SERVER_PORT"); v != "" {
 		cfg.Server.Port = v
+	}
+	if v := os.Getenv("GRPC_PORT"); v != "" {
+		cfg.Server.GRPCPort = v
 	}
 	if v := os.Getenv("ENV"); v != "" {
 		cfg.Server.Env = v
@@ -137,62 +142,3 @@ func (c *Config) Validate() error {
 	}
 	return nil
 }
-
-/*
-
-	// Абсолютный путь к файлу
-	wd, _ := os.Getwd()
-	projectRoot := filepath.Dir(wd) // server/ → my-password-manager/
-	envPath := filepath.Join(projectRoot, ".env")
-
-	// Основная попытка загрузки
-	if err := godotenv.Load(envPath); err == nil {
-		log.Printf(".env loaded from %s", envPath)
-	} else {
-		log.Println("Warning: .env file not found, using system environment variables")
-	}
-
-	// Читаем DB_DSN
-	dbDSN := os.Getenv("DB_DSN")
-	jwtSecret := os.Getenv("JWT_SECRET")
-
-	if dbDSN == "" {
-		log.Fatal("DB_DSN environment variable is required")
-	}
-
-	if jwtSecret == "" {
-		log.Fatal("JWT_SECRET environment variable not set, JWT_SECRET environment variable is required")
-	}
-
-	// Валидация минимальной длины секрета для безопасности (HS256)
-	if len(jwtSecret) < 32 {
-		log.Fatal("JWT secret length must be at least 32 bytes")
-	}
-
-	log.Println("Configuration loaded successfully")
-
-	return &Config{
-		Database: DatabaseConfig{
-			DSN: dbDSN,
-		},
-		JWT: JWTConfig{
-			Secret: jwtSecret,
-		},
-		Server: ServerConfig{
-			Port: getEnv("SERVER_PORT", "8080"),
-		},
-		Pprof: PprofConfig{
-			Port: getEnv("PPROF_PORT", "6060"),
-		},
-	}
-}
-
-// getEnv вспомогательная функция с деф значением
-func getEnv(key string, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
-
-*/
