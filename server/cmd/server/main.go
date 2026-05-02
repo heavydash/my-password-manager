@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -66,20 +65,18 @@ func main() {
 		zap.String("port", cfg.Server.Port),
 	)
 
-	// Подключаемся к БД через конфиг
-	db, err := sql.Open("postgres", cfg.Database.DSN)
-	if err != nil {
-		log.Error("Failed to connect to database: %v", zap.Error(err))
-		os.Exit(1)
-	}
-	defer db.Close()
+	// Database pool
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	// Проверка работоспособности
-	if err := db.Ping(); err != nil {
-		log.Error("Failed to ping database: %v", zap.Error(err))
+	dbPool, err := postgres.NewPool(ctx, cfg, log)
+	if err != nil {
+		log.Error("Failed to create connection pool", zap.Error(err))
 		os.Exit(1)
 	}
-	log.Info("Successfully connected to database")
+	defer dbPool.Close()
+
+	log.Info("Successfully connected to database (pool)")
 
 	// Запуск миграций
 	log.Info("running database migrations...")
@@ -90,8 +87,8 @@ func main() {
 	log.Info("migrations completed")
 
 	// Создаем Storage
-	userRepository := postgres.NewUserRepository(db, log)
-	secretRepository := postgres.NewSecretRepository(db, log)
+	userRepository := postgres.NewUserRepository(dbPool.Pool, log)
+	secretRepository := postgres.NewSecretRepository(dbPool.Pool, log)
 
 	// Создаем адаптеры
 	passwordAdapter := auth.NewPasswordAdapter(userRepository, cfg.JWT.Secret, log)
@@ -187,15 +184,15 @@ func main() {
 	<-quit
 	log.Info("Shutting down server...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	if err := srv.Shutdown(ctx); err != nil {
+	if err := srv.Shutdown(shutdownCtx); err != nil {
 
 		log.Error("Server forced to shutdown", zap.Error(err))
 	}
 
-	if err := pprofSrv.Shutdown(ctx); err != nil {
+	if err := pprofSrv.Shutdown(shutdownCtx); err != nil {
 		log.Error("Server forced to shutdown", zap.Error(err))
 	}
 

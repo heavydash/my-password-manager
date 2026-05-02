@@ -2,8 +2,9 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 	"gophkeeper/server/internal/domain"
 	"gophkeeper/server/internal/logger"
@@ -11,16 +12,16 @@ import (
 )
 
 type secretRepository struct {
-	db     *sql.DB
+	pool   *pgxpool.Pool
 	logger logger.Logger
 }
 
-func NewSecretRepository(db *sql.DB, log logger.Logger) ports.SecretStoragePort {
+func NewSecretRepository(pool *pgxpool.Pool, log logger.Logger) ports.SecretStoragePort {
 	if log == nil {
 		panic("logger is required")
 	}
 	return &secretRepository{
-		db:     db,
+		pool:   pool,
 		logger: log,
 	}
 }
@@ -38,7 +39,7 @@ func (r *secretRepository) Create(ctx context.Context, secret *ports.Secret) (*p
 		zap.String("title", secret.Title),
 	)
 
-	err := r.db.QueryRowContext(ctx, query,
+	err := r.pool.QueryRow(ctx, query,
 		secret.ID,
 		secret.UserID,
 		secret.Type,
@@ -66,7 +67,7 @@ func (r *secretRepository) GetByUserID(ctx context.Context, userID string) ([]*p
 		ORDER BY created_at DESC;
 	`
 
-	rows, err := r.db.QueryContext(ctx, query, userID)
+	rows, err := r.pool.Query(ctx, query, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -81,6 +82,10 @@ func (r *secretRepository) GetByUserID(ctx context.Context, userID string) ([]*p
 		secrets = append(secrets, &s)
 	}
 
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return secrets, nil
 }
 
@@ -92,11 +97,11 @@ func (r *secretRepository) GetSecret(ctx context.Context, id, userID string) (*p
 	`
 
 	var s ports.Secret
-	err := r.db.QueryRowContext(ctx, query, id, userID).Scan(
+	err := r.pool.QueryRow(ctx, query, id, userID).Scan(
 		&s.ID, &s.UserID, &s.Type, &s.Title, &s.Data, &s.Metadata, &s.CreatedAt, &s.UpdatedAt,
 	)
 
-	if err == sql.ErrNoRows {
+	if err == pgx.ErrNoRows {
 		return nil, domain.ErrNotFound
 	}
 	if err != nil {
@@ -109,12 +114,12 @@ func (r *secretRepository) GetSecret(ctx context.Context, id, userID string) (*p
 func (r *secretRepository) Delete(ctx context.Context, userID, secretID string) error {
 	const query = `DELETE FROM secrets WHERE id = $1 AND user_id = $2`
 
-	result, err := r.db.ExecContext(ctx, query, secretID, userID)
+	result, err := r.pool.Exec(ctx, query, secretID, userID)
 	if err != nil {
 		return err
 	}
 
-	if rows, _ := result.RowsAffected(); rows == 0 {
+	if result.RowsAffected() == 0 {
 		return domain.ErrNotFound
 	}
 

@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 type Config struct {
@@ -28,7 +29,13 @@ type ServerConfig struct {
 }
 
 type DatabaseConfig struct {
-	DSN string
+	DSN               string        `json:"dsn"`
+	MaxConns          int           `json:"max_conns"`
+	MinConns          int           `json:"min_conns"`
+	MaxConnLifetime   time.Duration `json:"max_conn_lifetime"`
+	MaxConnIdleTime   time.Duration `json:"max_conn_idle_time"`
+	HealthCheckPeriod time.Duration `json:"health_check_period"`
+	PingTimeout       time.Duration `json:"ping_timeout"`
 }
 
 type JWTConfig struct {
@@ -39,9 +46,8 @@ type PprofConfig struct {
 	Port string
 }
 
-// Load точка загрузки конфига
+// New — основная функция загрузки конфига
 func New() (*Config, error) {
-
 	cfg := defaultConfig()
 
 	// Флаги командной строки
@@ -78,7 +84,13 @@ func defaultConfig() *Config {
 			Debug:    false,
 		},
 		Database: DatabaseConfig{
-			DSN: "postgres://postgres:supersecretpassword123@localhost:5433/gophkeeper?sslmode=disable",
+			DSN:               "postgres://postgres:supersecretpassword123@localhost:5433/gophkeeper?sslmode=disable",
+			MaxConns:          25,
+			MinConns:          5,
+			MaxConnLifetime:   1 * time.Hour,
+			MaxConnIdleTime:   30 * time.Minute,
+			HealthCheckPeriod: 1 * time.Minute,
+			PingTimeout:       5 * time.Second,
 		},
 		JWT: JWTConfig{
 			Secret: "change-me-in-production-very-long-random-string-2026-gophkeeper",
@@ -102,6 +114,7 @@ func loadDotEnv() {
 }
 
 func overwriteFromEnv(cfg *Config) {
+	// Server
 	if v := os.Getenv("SERVER_PORT"); v != "" {
 		cfg.Server.Port = v
 	}
@@ -114,8 +127,15 @@ func overwriteFromEnv(cfg *Config) {
 	if v := os.Getenv("DEBUG"); v != "" {
 		cfg.Server.Debug = v == "true" || v == "1"
 	}
+	// DB
 	if v := os.Getenv("DB_DSN"); v != "" {
 		cfg.Database.DSN = v
+	}
+	if v := os.Getenv("DB_MAX_CONNS"); v != "" {
+		fmt.Sscanf(v, "%d", &cfg.Database.MaxConns)
+	}
+	if v := os.Getenv("DB_MIN_CONNS"); v != "" {
+		fmt.Sscanf(v, "%d", &cfg.Database.MinConns)
 	}
 	if v := os.Getenv("JWT_SECRET"); v != "" {
 		cfg.JWT.Secret = v

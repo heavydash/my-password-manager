@@ -2,27 +2,29 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/lib/pq"
 	"go.uber.org/zap"
+	"gophkeeper/server/internal/domain"
 	"gophkeeper/server/internal/logger"
 	"gophkeeper/server/internal/ports"
 )
 
 type storage struct {
-	db     *sql.DB
+	pool   *pgxpool.Pool
 	logger logger.Logger
 }
 
-func NewUserRepository(db *sql.DB, log logger.Logger) ports.StoragePort {
+func NewUserRepository(pool *pgxpool.Pool, log logger.Logger) ports.StoragePort {
 	if log == nil {
 		panic("logger is required for user storage")
 	}
-	if db == nil {
+	if pool == nil {
 		panic("database connection is required")
 	}
 
-	return &storage{db: db,
+	return &storage{pool: pool,
 		logger: log}
 }
 
@@ -39,7 +41,7 @@ func (s *storage) CreateUser(ctx context.Context, user ports.User) (string, erro
 	)
 
 	var userID string
-	err := s.db.QueryRowContext(ctx, query,
+	err := s.pool.QueryRow(ctx, query,
 		user.Email,
 		user.PasswordHash,
 		user.Provider,
@@ -71,7 +73,7 @@ func (s *storage) GetUserByEmail(ctx context.Context, email string) (ports.User,
 	s.logger.Debug("fetching user by email", zap.String("email", email))
 
 	var u ports.User
-	err := s.db.QueryRowContext(ctx, query, email).Scan(
+	err := s.pool.QueryRow(ctx, query, email).Scan(
 		&u.ID,
 		&u.Email,
 		&u.PasswordHash,
@@ -79,10 +81,9 @@ func (s *storage) GetUserByEmail(ctx context.Context, email string) (ports.User,
 		&u.ProviderID,
 	)
 	if err != nil {
-		s.logger.Warn("user not found by email",
-			zap.String("email", email),
-			zap.Error(err),
-		)
+		if err == pgx.ErrNoRows {
+			return ports.User{}, domain.ErrUserNotFound
+		}
 		return ports.User{}, err
 	}
 
@@ -103,7 +104,7 @@ func (s *storage) GetUserByID(ctx context.Context, id string) (ports.User, error
 	s.logger.Debug("fetching user by id", zap.String("user_id", id))
 
 	var u ports.User
-	err := s.db.QueryRowContext(ctx, query, id).Scan(
+	err := s.pool.QueryRow(ctx, query, id).Scan(
 		&u.ID,
 		&u.Email,
 		&u.PasswordHash,
@@ -112,10 +113,9 @@ func (s *storage) GetUserByID(ctx context.Context, id string) (ports.User, error
 	)
 
 	if err != nil {
-		s.logger.Warn("user not found by id",
-			zap.String("user_id", id),
-			zap.Error(err),
-		)
+		if err == pgx.ErrNoRows {
+			return ports.User{}, domain.ErrUserNotFound
+		}
 		return ports.User{}, err
 	}
 

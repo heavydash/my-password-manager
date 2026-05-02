@@ -1,7 +1,8 @@
-package postgres
+package memory
 
 import (
 	"context"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 	"gophkeeper/server/internal/domain"
 	"gophkeeper/server/internal/logger"
@@ -15,7 +16,11 @@ type secretStorage struct {
 	mu      sync.RWMutex
 }
 
-func NewSecretStorage(log logger.Logger) ports.SecretStoragePort {
+func NewSecretStorage(pool *pgxpool.Pool, log logger.Logger) ports.SecretStoragePort {
+	if pool == nil {
+		panic("database connection is required")
+	}
+
 	if log == nil {
 		panic("logger is required for secretStorage")
 	}
