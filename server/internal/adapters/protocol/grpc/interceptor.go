@@ -16,7 +16,8 @@ func AuthInterceptor(validator domain.TokenValidator, log logger.Logger) grpc.Un
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		if info.FullMethod == "/gophkeeper.AuthService/Register" ||
 			info.FullMethod == "/gophkeeper.AuthService/LoginPassword" ||
-			info.FullMethod == "/gophkeeper.AuthService/LoginOAuth" {
+			info.FullMethod == "/gophkeeper.AuthService/LoginOAuth" ||
+			info.FullMethod == "/gophkeeper.AuthService/GetOAuthURL" {
 			return handler(ctx, req)
 		}
 

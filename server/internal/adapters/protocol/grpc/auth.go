@@ -52,11 +52,29 @@ func (s *authService) LoginPassword(ctx context.Context, req *pb.LoginPasswordRe
 	return resp, nil
 }
 
+func (s *authService) GetOAuthURL(ctx context.Context, req *pb.GetOAuthURLRequest) (*pb.GetOAuthURLResponse, error) {
+	s.logger.Info("gRPC GetOAuthURL", zap.String("provider", req.GetProvider()))
+
+	url, _, err := s.authUC.GetOAuthURL(req.GetProvider())
+	if err != nil {
+		return nil, err
+	}
+
+	resp := &pb.GetOAuthURLResponse{}
+	resp.SetAuthUrl(url)
+	return resp, nil
+}
+
 func (s *authService) LoginOAuth(ctx context.Context, req *pb.LoginOAuthRequest) (*pb.LoginResponse, error) {
 	s.logger.Info("gRPC LoginOAuth", zap.String("provider", req.GetProvider()))
 
-	resp := &pb.LoginResponse{}
-	resp.SetMessage("oauth login not implemented yet")
+	token, err := s.authUC.LoginOAuth(ctx, req.GetCode()) // or oneTimeCode
+	if err != nil {
+		return nil, err
+	}
 
+	resp := &pb.LoginResponse{}
+	resp.SetToken(token)
+	resp.SetMessage("login successfully")
 	return resp, nil
 }

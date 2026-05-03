@@ -107,10 +107,22 @@ func (u *AuthUseCase) LoginPassword(ctx context.Context, email, password string)
 	return token, userID, nil
 }
 
-func (u *AuthUseCase) LoginOAuth(ctx context.Context, provider, code string) (string, error) {
-	u.logger.Info("OAuth login attempt", zap.String("provider", provider))
+func (u *AuthUseCase) GetOAuthURL(provider string) (string, string, error) {
+	u.logger.Info("generating OAuth URL", zap.String("provider", provider))
+	return u.authPort.GetOAuthURL(provider)
+}
 
-	u.logger.Info("OAuth login successful", zap.String("provider", provider))
+func (u *AuthUseCase) HandleOAuthCallback(provider, code, state string) (string, error) {
+	u.logger.Info("handling OAuth callback", zap.String("provider", provider))
+	return u.authPort.HandleCallback(provider, code, state)
+}
 
-	return u.authPort.AuthenticateOAuth(ctx, provider, code)
+func (u *AuthUseCase) LoginOAuth(ctx context.Context, oneTimeCode string) (string, error) {
+	u.logger.Info("completing OAuth login")
+	token, err := u.authPort.AuthenticateOAuth(ctx, oneTimeCode)
+	if err != nil {
+		u.logger.Error("OAuth login failed", zap.Error(err))
+		return "", err
+	}
+	return token, nil
 }

@@ -92,10 +92,11 @@ func main() {
 
 	// Создаем адаптеры
 	passwordAdapter := auth.NewPasswordAdapter(userRepository, cfg.JWT.Secret, log)
+	oauthAdapter := auth.NewOAuthAdapter(cfg.OAuth, dbPool.Pool, passwordAdapter)
 	secretAdapter := secret.NewSecretAdapter(secretRepository, log)
 
 	// UseCases
-	authUserCase := domain.NewAuthUseCase(passwordAdapter, log)
+	authUserCase := domain.NewAuthUseCase(oauthAdapter, log)
 	secretUseCase := domain.NewSecretUseCase(secretAdapter, domain.JWTValidatorAdapter{
 		ValidateFunc: passwordAdapter.ValidateJWT,
 	})
@@ -117,6 +118,10 @@ func main() {
 	pub := r.Group("/")
 	pub.POST("/register", handler.Register(authUserCase, log))
 	pub.POST("/login", handler.Login(authUserCase, log))
+	oauthHandler := handler.NewOAuthHandler(authUserCase)
+
+	pub.GET("/auth/:provider/login", oauthHandler.OAuthLogin)
+	pub.GET("/auth/:provider/callback", oauthHandler.OAuthCallback)
 
 	// Защищенные роуты
 	protect := r.Group("/")
