@@ -1,3 +1,11 @@
+// Package auth содержит адаптеры аутентификации для GophKeeper.
+//
+// Поддерживаются два провайдера:
+//   - Password (email + пароль с Argon2 + JWT)
+//   - OAuth2 (Google, Yandex)
+//
+// Все адаптеры реализуют интерфейс ports.AuthPort и используются
+// в handlers и usecases.
 package auth
 
 import (
@@ -19,16 +27,33 @@ import (
 	"time"
 )
 
+// OAuthAdapter — адаптер для OAuth2-провайдеров (Google, Yandex).
+// Реализует ports.AuthPort.
+//
+// Хранит состояние OAuth-flow в таблице oauth_states (state, one_time_code).
+// Для генерации JWT делегирует вызовы в authPort (passwordAdapter).
 type OAuthAdapter struct {
 	cfg      config.OAuth
 	db       *pgxpool.Pool
 	authPort ports.AuthPort
 }
 
+// NewOAuthAdapter создаёт новый OAuth-адаптер.
+//
+// Параметры:
+//   - cfg — конфигурация OAuth-клиентов (ClientID, ClientSecret, RedirectURL)
+//   - db — пул подключений к PostgreSQL для хранения состояний flow
+//   - authPort — делегат для работы с пользователями и генерации JWT
+//
+// Возвращает объект, реализующий ports.AuthPort.
 func NewOAuthAdapter(cfg config.OAuth, db *pgxpool.Pool, authPort ports.AuthPort) ports.AuthPort {
 	return &OAuthAdapter{cfg: cfg, db: db, authPort: authPort}
 }
 
+// GetOAuthURL возвращает URL для начала OAuth2 flow и сгенерированный state.
+//
+// State сохраняется в БД с TTL 15 минут для защиты от CSRF.
+// Используется на фронтенде/клиенте для редиректа пользователя на провайдера.
 func (a *OAuthAdapter) GetOAuthURL(provider string) (string, string, error) {
 	state := a.generateState()
 	_, err := a.db.Exec(context.Background(),
@@ -41,6 +66,10 @@ func (a *OAuthAdapter) GetOAuthURL(provider string) (string, string, error) {
 	return cfg.AuthCodeURL(state, oauth2.AccessTypeOffline), state, nil
 }
 
+// HandleCallback обрабатывает callback от OAuth-провайдера.
+//
+// Проверяет state, обменивает code на token, получает данные пользователя,
+// создаёт one_time_code и возвращает его клиенту для последующей авторизации.
 func (a *OAuthAdapter) HandleCallback(provider, code, state string) (string, error) {
 	if !a.validateState(state, provider) {
 		return "", fmt.Errorf("invalid state")
@@ -72,6 +101,10 @@ func (a *OAuthAdapter) HandleCallback(provider, code, state string) (string, err
 	return oneTimeCode, nil
 }
 
+// AuthenticateOAuth завершает OAuth-flow по one_time_code.
+//
+// Находит user_id по one_time_code, удаляет использованный код,
+// генерирует JWT через authPort и возвращает токен.
 func (a *OAuthAdapter) AuthenticateOAuth(ctx context.Context, oneTimeCode string) (token string, err error) {
 	// Находим user_id по oneTimeCode
 	var userID string
@@ -93,6 +126,9 @@ func (a *OAuthAdapter) AuthenticateOAuth(ctx context.Context, oneTimeCode string
 	return token, nil
 }
 
+// ExchangeOneTimeCode — высокоуровневый метод для обмена one_time_code на AuthResponse.
+//
+// Используется в handlers. Возвращает готовый domain.AuthResponse с токеном.
 func (a *OAuthAdapter) ExchangeOneTimeCode(ctx context.Context, oneTimeCode string) (*domain.AuthResponse, error) {
 	token, err := a.AuthenticateOAuth(ctx, oneTimeCode)
 	if err != nil {
@@ -105,7 +141,10 @@ func (a *OAuthAdapter) ExchangeOneTimeCode(ctx context.Context, oneTimeCode stri
 	}, nil
 }
 
-// getConfig - вспомогательный метод
+// getConfig возвращает *oauth2.Config для указанного провайдера.
+//
+// Поддерживает Google (стандартный endpoint) и Yandex (кастомный).
+// Метод неэкспортированный, используется только внутри адаптера.
 func (a *OAuthAdapter) getConfig(provider string) *oauth2.Config {
 	switch provider {
 	case "google":
@@ -131,7 +170,10 @@ func (a *OAuthAdapter) getConfig(provider string) *oauth2.Config {
 	panic("unknown provider")
 }
 
-// fetchUserInfo - вспомогательный метод
+// fetchUserInfo запрашивает данные пользователя у OAuth-провайдера по access token.
+//
+// Для Google использует /userinfo, для Yandex — /info.
+// Возвращает унифицированную структуру domain.OAuthUserInfo.
 func (a *OAuthAdapter) fetchUserInfo(provider, Token string) (*domain.OAuthUserInfo, error) {
 	var url string
 
@@ -181,6 +223,7 @@ func (a *OAuthAdapter) fetchUserInfo(provider, Token string) (*domain.OAuthUserI
 	return &info, nil
 }
 
+// saveState сохраняет state в БД (вспомогательный метод).
 func (a *OAuthAdapter) saveState(state, provider string) error {
 	_, err := a.db.Exec(context.Background(),
 		`INSERT INTO oauth_states (state, provider, expires_at) VALUES ($1, $2, NOW() + INTERVAL '15 minutes')`,
@@ -188,6 +231,9 @@ func (a *OAuthAdapter) saveState(state, provider string) error {
 	return err
 }
 
+// validateState проверяет существование state и удаляет его после использования.
+//
+// Возвращает true, если state валиден и не истёк.
 func (a *OAuthAdapter) validateState(state, provider string) bool {
 	var exists bool
 	a.db.QueryRow(context.Background(),
@@ -197,6 +243,7 @@ func (a *OAuthAdapter) validateState(state, provider string) bool {
 	return exists
 }
 
+// saveOneTimeCode сохраняет one_time_code и user_id (вспомогательный).
 func (a *OAuthAdapter) saveOneTimeCode(code string, userID string) error { // UUID as string or []byte
 	_, err := a.db.Exec(context.Background(),
 		`UPDATE oauth_states SET one_time_code = $1, user_id = $2 WHERE state = $1`,
@@ -206,27 +253,32 @@ func (a *OAuthAdapter) saveOneTimeCode(code string, userID string) error { // UU
 
 // Старые методы
 
+// CreateUser делегирует создание пользователя в passwordAdapter.
 func (a *OAuthAdapter) CreateUser(ctx context.Context, user ports.User) (string, error) {
 	return a.authPort.CreateUser(ctx, user)
 }
 
+// AuthenticatePassword делегирует парольную аутентификацию.
 func (a *OAuthAdapter) AuthenticatePassword(ctx context.Context, email, password string) (string, string, error) {
 	return a.authPort.AuthenticatePassword(ctx, email, password)
 }
 
+// GetUserByID делегирует получение пользователя по ID.
 func (a *OAuthAdapter) GetUserByID(ctx context.Context, id string) (ports.User, error) {
 	return a.authPort.GetUserByID(ctx, id)
 }
 
+// ValidateJWT делегирует валидацию JWT.
 func (a *OAuthAdapter) ValidateJWT(tokenString string) (string, error) {
 	return a.authPort.ValidateJWT(tokenString)
 }
 
+// GenerateJWT делегирует генерацию JWT.
 func (a *OAuthAdapter) GenerateJWT(userID string) (string, error) {
 	return a.authPort.GenerateJWT(userID)
 }
 
-// getString - вспомогательная функция
+// getString — вспомогательная функция для безопасного извлечения строки из map.
 func getString(m map[string]interface{}, key string) string {
 	if v, ok := m[key].(string); ok {
 		return v
@@ -234,7 +286,7 @@ func getString(m map[string]interface{}, key string) string {
 	return ""
 }
 
-// generateState
+// generateState генерирует криптографически стойкий state..
 func (a *OAuthAdapter) generateState() string {
 	b := make([]byte, 32)
 	rand.Read(b)

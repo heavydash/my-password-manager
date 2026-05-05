@@ -49,7 +49,7 @@ func (s *Server) Start(addr string) error {
 	return s.grpcServer.Serve(lis)
 }
 
-func (s *Server) Stop() {
+func (s *Server) GracefulStop() {
 	if s.grpcServer != nil {
 		s.grpcServer.GracefulStop()
 		s.logger.Info("gRPC server stopped gracefully")

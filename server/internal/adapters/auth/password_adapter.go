@@ -1,3 +1,10 @@
+// Package auth содержит адаптеры аутентификации для GophKeeper.
+//
+// Поддерживаются два провайдера:
+//   - Password (email + пароль с Argon2 + JWT)
+//   - OAuth2 (Google, Yandex)
+//
+// Все адаптеры реализуют интерфейс ports.AuthPort.
 package auth
 
 import (
@@ -14,12 +21,25 @@ import (
 	"time"
 )
 
+// passwordAdapter — адаптер парольной аутентификации.
+//
+// Реализует ports.AuthPort.
+// Использует Argon2 для хеширования паролей и JWT (HS256) для токенов.
+// Хранит пользователей через StoragePort.
 type passwordAdapter struct {
 	storage   ports.StoragePort
 	jwtSecret []byte
 	logger    logger.Logger
 }
 
+// NewPasswordAdapter создаёт новый адаптер парольной аутентификации.
+//
+// Параметры:
+//   - storage   — порт для работы с хранилищем пользователей
+//   - jwtSecret — секрет для подписи JWT-токенов (должен быть длинным и случайным)
+//   - log       — логгер
+//
+// Возвращает объект, реализующий ports.AuthPort.
 func NewPasswordAdapter(storage ports.StoragePort, jwtSecret string, log logger.Logger) ports.AuthPort {
 	return &passwordAdapter{
 		storage:   storage,
@@ -28,6 +48,11 @@ func NewPasswordAdapter(storage ports.StoragePort, jwtSecret string, log logger.
 	}
 }
 
+// CreateUser создаёт нового пользователя.
+//
+// Преобразует ports.User в domain.User, хеширует пароль (если есть),
+// сохраняет через StoragePort.
+// Возвращает userID или domain.ErrUserAlreadyExists.
 func (a *passwordAdapter) CreateUser(ctx context.Context, user ports.User) (string,
 	error) {
 
@@ -66,6 +91,12 @@ func (a *passwordAdapter) CreateUser(ctx context.Context, user ports.User) (stri
 	return userID, nil
 }
 
+// AuthenticatePassword выполняет аутентификацию по email и паролю.
+//
+// 1. Находит пользователя по email
+// 2. Проверяет пароль через Argon2
+// 3. Генерирует JWT
+// Возвращает token, userID или domain.ErrInvalidCredentials.
 func (a *passwordAdapter) AuthenticatePassword(ctx context.Context, email, password string) (string, string, error) {
 	a.logger.Info("password authentication attempt", zap.String("email", email))
 
@@ -94,12 +125,14 @@ func (a *passwordAdapter) AuthenticatePassword(ctx context.Context, email, passw
 	return token, user.ID, nil
 }
 
+// AuthenticateOAuth — заглушка для OAuth-аутентификации в passwordAdapter.
+//
+// В будущем может делегировать в OAuthAdapter.
+// Сейчас возвращает токен для временного пользователя.
 func (a *passwordAdapter) AuthenticateOAuth(ctx context.Context, oneTimeCode string) (token string, err error) {
 	a.logger.Info("OAuth authentication started with oneTimeCode")
 
-	// Здесь можно вызвать oauthAdapter или реализовать логику
-	// Пока делегируем (если у тебя есть поле oauthAdapter) или stub
-	token, err = a.generateJWT("temp-user-id") // временно
+	token, err = a.generateJWT("temp-user-id")
 	if err != nil {
 		a.logger.Error("failed to generate JWT for OAuth", zap.Error(err))
 		return "", err
@@ -109,6 +142,9 @@ func (a *passwordAdapter) AuthenticateOAuth(ctx context.Context, oneTimeCode str
 	return token, nil
 }
 
+// GetUserByID возвращает пользователя по ID.
+//
+// Делегирует вызов в StoragePort и преобразует domain.User обратно в ports.User.
 func (a *passwordAdapter) GetUserByID(ctx context.Context, id string) (ports.User, error) {
 	a.logger.Debug("getting user by id", zap.String("user_id", id))
 
@@ -127,11 +163,18 @@ func (a *passwordAdapter) GetUserByID(ctx context.Context, id string) (ports.Use
 	}, nil
 }
 
+// checkPassword сравнивает введённый пароль с хешем.
+//
+// Использует Argon2. Неэкспортированный метод.
 func (a *passwordAdapter) checkPassword(password, hashed string) bool {
 	expectedHash := a.hashPassword(password)
 	return hashed == expectedHash
 }
 
+// generateJWT создаёт JWT-токен для пользователя.
+//
+// Claims содержат user_ID, exp (15 минут), iat.
+// Подпись HS256. Неэкспортированный метод.
 func (a *passwordAdapter) generateJWT(userID string) (string, error) {
 	now := time.Now()
 
@@ -151,6 +194,10 @@ func (a *passwordAdapter) generateJWT(userID string) (string, error) {
 	return tokenString, nil
 }
 
+// ValidateJWT проверяет JWT-токен и извлекает user_ID.
+//
+// Поддерживает несколько вариантов ключа в claims ("user_id", "userID" и т.д.).
+// Возвращает userID или domain.ErrTokenExpired / domain.ErrTokenInvalid.
 func (a *passwordAdapter) ValidateJWT(tokenString string) (string, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		// Защита для HS256
@@ -180,20 +227,29 @@ func (a *passwordAdapter) ValidateJWT(tokenString string) (string, error) {
 	return "", domain.ErrTokenInvalid
 }
 
+// hashPassword хэширует пароль с помощью Argon2id.
+//
+// Использует фиксированный salt "gophkeeper-salt" (в production рекомендуется рандомный).
+// Неэкспортированный метод.
 func (a *passwordAdapter) hashPassword(password string) string {
 	salt := []byte("gophkeeper-salt")
 	hash := argon2.IDKey([]byte(password), salt, 1, 64*1024, 4, 32)
 	return base64.URLEncoding.EncodeToString(hash)
 }
 
+// GetOAuthURL — заглушка для OAuth-метода в passwordAdapter.
+//
+// Возвращает ошибку, т.к. OAuth обрабатывается в OAuthAdapter.
 func (a *passwordAdapter) GetOAuthURL(provider string) (string, string, error) {
 	return "", "", fmt.Errorf("OAuth not fully implemented in passwordAdapter")
 }
 
+// HandleCallback — заглушка для OAuth-callback в passwordAdapter.
 func (a *passwordAdapter) HandleCallback(provider, code, state string) (string, error) {
 	return "", fmt.Errorf("OAuth callback not implemented")
 }
 
+// GenerateJWT делегирует генерацию JWT (экспортированный обёртка).
 func (a *passwordAdapter) GenerateJWT(userID string) (string, error) {
 	return a.generateJWT(userID)
 }

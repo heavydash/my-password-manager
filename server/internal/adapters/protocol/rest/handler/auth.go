@@ -1,3 +1,7 @@
+// Package handler содержит HTTP-handlers (Gin) для GophKeeper.
+//
+// Все handlers являются фабриками (возвращают gin.HandlerFunc), чтобы можно было
+// легко внедрять зависимости (UseCase, Logger).
 package handler
 
 import (
@@ -9,7 +13,10 @@ import (
 	"net/http"
 )
 
-// Register — фабрика handler'а регистрации
+// Register возвращает handler регистрации пользователя.
+//
+// Принимает email и password, валидирует их через gin binding,
+// вызывает AuthUseCase.Register и возвращает userID.
 func Register(uc *domain.AuthUseCase, log logger.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
@@ -54,7 +61,9 @@ func Register(uc *domain.AuthUseCase, log logger.Logger) gin.HandlerFunc {
 	}
 }
 
-// Login — фабрика handler'а логина
+// Login возвращает handler авторизации по email + password.
+//
+// При успешном логине возвращает JWT-токен.
 func Login(uc *domain.AuthUseCase, log logger.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
@@ -100,7 +109,9 @@ func Login(uc *domain.AuthUseCase, log logger.Logger) gin.HandlerFunc {
 	}
 }
 
-// Profile — защищённый эндпоинт, возвращает информацию о текущем пользователе
+// Profile — защищённый эндпоинт.
+//
+// Ожидает, что middleware ранее положил `userID` в контекст Gin.
 func Profile(log logger.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Извлекаем userID, который положил middleware

@@ -1,7 +1,15 @@
+// Package config отвечает за загрузку и валидацию конфигурации приложения.
+//
+// Поддерживает (по приоритету):
+// 1. Переменные окружения
+// 2. .env файл
+// 3. JSON-файл (флаг -c)
+// 4. Значения по умолчанию
 package config
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"github.com/bytedance/gopkg/util/logger"
@@ -13,6 +21,7 @@ import (
 	"time"
 )
 
+// Config — корневая структура конфигурации GophKeeper.
 type Config struct {
 	Server   ServerConfig
 	Database DatabaseConfig
@@ -60,13 +69,22 @@ type PprofConfig struct {
 	Port string
 }
 
-// New — основная функция загрузки конфига
+// New — основная функция для продакшена.
 func New() (*Config, error) {
+	return newWithFlags(flag.CommandLine)
+}
+
+// newWithFlags — версия для тестов (принимает свой FlagSet).
+func newWithFlags(fs *flag.FlagSet) (*Config, error) {
 	cfg := defaultConfig()
 
 	// Флаги командной строки
-	configFile := flag.String("c", "", "path to config file")
-	flag.Parse()
+	configFile := fs.String("c", "", "path to config file")
+	if err := fs.Parse(os.Args[1:]); err != nil {
+		if !errors.Is(err, flag.ErrHelp) {
+			log.Printf("flag parse warning: %v", err)
+		}
+	}
 
 	// JSON-файл
 	if *configFile != "" {
@@ -96,6 +114,7 @@ func New() (*Config, error) {
 	return cfg, nil
 }
 
+// defaultConfig возвращает конфигурацию со значениями по умолчанию.
 func defaultConfig() *Config {
 	return &Config{
 		Server: ServerConfig{
@@ -134,6 +153,7 @@ func defaultConfig() *Config {
 	}
 }
 
+// loadDotEnv пытается загрузить .env файл из корня проекта.
 func loadDotEnv() {
 	wd, _ := os.Getwd()
 	projectRoot := filepath.Dir(wd)
@@ -146,6 +166,7 @@ func loadDotEnv() {
 	}
 }
 
+// overwriteFromEnv перезаписывает конфигурацию значениями из переменных окружения.
 func overwriteFromEnv(cfg *Config) {
 	// Server
 	if v := os.Getenv("SERVER_PORT"); v != "" {
@@ -198,6 +219,7 @@ func overwriteFromEnv(cfg *Config) {
 	}
 }
 
+// loadFromJSON загружает конфигурацию из JSON-файла.
 func loadFromJSON(path string, cfg *Config) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -206,6 +228,13 @@ func loadFromJSON(path string, cfg *Config) error {
 	return json.Unmarshal(data, cfg)
 }
 
+// Validate проверяет обязательные поля и корректность значений.
+//
+// Проверяемые условия:
+//   - JWT.Secret ≥ 32 символа
+//   - Database.DSN обязателен
+//   - Порты и окружение обязательны
+//   - В production режиме требуются OAuth credentials
 func (c *Config) Validate() error {
 	if c.JWT.Secret == "" || len(c.JWT.Secret) < 32 {
 		return fmt.Errorf("JWT_SECRET must be at least 32 characters long")
@@ -229,7 +258,8 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("Server.Env is required")
 	}
 	if c.Server.Env == "production" {
-		if c.OAuth.Google.ClientID == "" || c.OAuth.Google.ClientSecret == "" || c.OAuth.Yandex.ClientID == "" || c.OAuth.Yandex.ClientSecret == "" {
+		if c.OAuth.Google.ClientID == "" || c.OAuth.Google.ClientSecret == "" ||
+			c.OAuth.Yandex.ClientID == "" || c.OAuth.Yandex.ClientSecret == "" {
 			return fmt.Errorf("OAuth credentials required in production")
 		}
 	}

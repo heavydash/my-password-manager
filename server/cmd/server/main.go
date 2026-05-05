@@ -53,12 +53,7 @@ func main() {
 		fmt.Printf("Failed to create logger: %v", zap.Error(err))
 		os.Exit(1)
 	}
-	defer func() {
-		if err := log.Sync(); err != nil {
-			fmt.Printf("Failed to sync logger: %v", zap.Error(err))
-			panic(err)
-		}
-	}()
+	defer log.Sync()
 
 	log.Info("GophKeeper Server starting...",
 		zap.String("version", buildVersion),
@@ -197,14 +192,18 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	grpcServer.GracefulStop()
+
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 
-		log.Error("Server forced to shutdown", zap.Error(err))
+		log.Error("HTTP shutdown failed", zap.Error(err))
 	}
 
 	if err := pprofSrv.Shutdown(shutdownCtx); err != nil {
-		log.Error("Server forced to shutdown", zap.Error(err))
+		log.Error("Pprof Server forced to shutdown", zap.Error(err))
 	}
+
+	dbPool.Close()
 
 	log.Info("Server exited gracefully")
 }

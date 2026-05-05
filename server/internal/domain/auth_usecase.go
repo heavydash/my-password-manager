@@ -9,7 +9,9 @@ import (
 	"gophkeeper/server/internal/ports"
 )
 
-// User - основная сущность пользователя
+// User — основная доменная сущность пользователя.
+//
+// Используется во всех usecases.
 type User struct {
 	ID           string
 	Email        string
@@ -18,12 +20,18 @@ type User struct {
 	ProviderID   string
 }
 
-// AuthUseCase - вся бизнес логика аутентификации
+// AuthUseCase — бизнес-логика аутентификации.
+//
+// Содержит все правила регистрации, логина (password + OAuth).
+// Не зависит от БД и HTTP — только от ports.AuthPort.
 type AuthUseCase struct {
 	authPort ports.AuthPort
 	logger   logger.Logger
 }
 
+// NewAuthUseCase создаёт usecase аутентификации.
+//
+// Паникует, если переданы nil (fail-fast).
 func NewAuthUseCase(authPort ports.AuthPort, log logger.Logger) *AuthUseCase {
 	if log == nil {
 		panic("logger is required")
@@ -35,6 +43,9 @@ func NewAuthUseCase(authPort ports.AuthPort, log logger.Logger) *AuthUseCase {
 		logger: log}
 }
 
+// Register регистрирует нового пользователя.
+//
+// Валидирует email, делегирует создание в authPort.
 func (u *AuthUseCase) Register(ctx context.Context, email, password string) (string, error) {
 	if email == "" {
 		u.logger.Warn("registration failed: email is required")
@@ -77,6 +88,9 @@ func (u *AuthUseCase) Register(ctx context.Context, email, password string) (str
 	return userID, nil
 }
 
+// LoginPassword логинит пользователя по email + паролю.
+//
+// Возвращает JWT-токен и userID.
 func (u *AuthUseCase) LoginPassword(ctx context.Context, email, password string) (string, string, error) {
 	// Валидация входных данных
 	if email == "" || password == "" {
@@ -107,16 +121,19 @@ func (u *AuthUseCase) LoginPassword(ctx context.Context, email, password string)
 	return token, userID, nil
 }
 
+// GetOAuthURL - метод OAuth-flow
 func (u *AuthUseCase) GetOAuthURL(provider string) (string, string, error) {
 	u.logger.Info("generating OAuth URL", zap.String("provider", provider))
 	return u.authPort.GetOAuthURL(provider)
 }
 
+// HandleOAuthCallback - метод OAuth-flow
 func (u *AuthUseCase) HandleOAuthCallback(provider, code, state string) (string, error) {
 	u.logger.Info("handling OAuth callback", zap.String("provider", provider))
 	return u.authPort.HandleCallback(provider, code, state)
 }
 
+// LoginOAuth - метод OAuth-flow
 func (u *AuthUseCase) LoginOAuth(ctx context.Context, oneTimeCode string) (string, error) {
 	u.logger.Info("completing OAuth login")
 	token, err := u.authPort.AuthenticateOAuth(ctx, oneTimeCode)

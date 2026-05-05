@@ -5,6 +5,7 @@ import (
 	"time"
 )
 
+// Secret — структура секрета
 type Secret struct {
 	ID        string    `json:"id"`
 	UserID    string    `json:"user_id"`
@@ -16,7 +17,7 @@ type Secret struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// SecretPort — порт, через который UseCase общается с адаптером
+// SecretPort — порт, через который UseCase общается с адаптером, порт для бизнес-логики (используется SecretUseCase).
 type SecretPort interface {
 	Create(ctx context.Context, secret *Secret) (*Secret, error)
 	GetByUserID(ctx context.Context, userID string) ([]*Secret, error)
@@ -25,6 +26,8 @@ type SecretPort interface {
 }
 
 // SecretStoragePort — порт для работы с хранилищем
+//
+// Может совпадать с SecretPort, но разделён для ясности.
 type SecretStoragePort interface {
 	Create(ctx context.Context, secret *Secret) (*Secret, error)
 	GetByUserID(ctx context.Context, userID string) ([]*Secret, error)
