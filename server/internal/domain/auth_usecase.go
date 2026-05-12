@@ -34,10 +34,11 @@ type AuthUseCase struct {
 // Паникует, если переданы nil (fail-fast).
 func NewAuthUseCase(authPort ports.AuthPort, log logger.Logger) *AuthUseCase {
 	if log == nil {
-		panic("logger is required")
+		log = &logger.ZapLogger{}
 	}
 	if authPort == nil {
-		panic("auth cannot be nil")
+		log.Error("authPort is required")
+		return nil
 	}
 	return &AuthUseCase{authPort: authPort,
 		logger: log}
@@ -49,7 +50,7 @@ func NewAuthUseCase(authPort ports.AuthPort, log logger.Logger) *AuthUseCase {
 func (u *AuthUseCase) Register(ctx context.Context, email, password string) (string, error) {
 	if email == "" {
 		u.logger.Warn("registration failed: email is required")
-		return "", errors.New("email is required")
+		return "", ErrEmailRequired
 	}
 
 	u.logger.Info("attempting to register user", zap.String("email", email))
@@ -95,7 +96,7 @@ func (u *AuthUseCase) LoginPassword(ctx context.Context, email, password string)
 	// Валидация входных данных
 	if email == "" || password == "" {
 		u.logger.Warn("login failed: email or password is empty")
-		return "", "", errors.New("email or password is required")
+		return "", "", ErrInvalidInput
 	}
 
 	u.logger.Info("attempting login", zap.String("email", email))

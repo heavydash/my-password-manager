@@ -49,7 +49,7 @@ func Register(uc *domain.AuthUseCase, log logger.Logger) gin.HandlerFunc {
 		}
 
 		// Успешный ответ
-		log.Info("user registered successfully",
+		log.Debug("user registered successfully",
 			zap.String("user_id", userID),
 			zap.String("email", req.Email),
 		)
@@ -96,7 +96,7 @@ func Login(uc *domain.AuthUseCase, log logger.Logger) gin.HandlerFunc {
 		}
 
 		// Успешный логин
-		log.Info("user logged in successfully",
+		log.Debug("user logged in successfully",
 			zap.String("user_id", userID),
 			zap.String("email", req.Email),
 		)

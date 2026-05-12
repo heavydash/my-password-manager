@@ -8,6 +8,7 @@ var (
 
 	// ErrUserAlreadyExists — для регистрации, пользователь с таким email уже существует
 	ErrUserAlreadyExists = errors.New("user already exists")
+	ErrEmailRequired     = errors.New("email is required")
 
 	// ErrUserNotFound — пользователь не найден
 	ErrUserNotFound = errors.New("user not found")

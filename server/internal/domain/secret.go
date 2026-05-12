@@ -76,7 +76,7 @@ func NewSecret(userID string, secretType SecretType, title string, encryptedData
 //
 // Используется только внутри пакета. В production рекомендуется заменить на UUID.
 func generateID() string {
-	return "" + time.Now().UTC().Format("20060102150405")
+	return time.Now().UTC().Format("20060102150405")
 }
 
 // ValidateToken делегирует вызов функции-валидатора.

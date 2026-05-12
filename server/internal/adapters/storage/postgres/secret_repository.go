@@ -39,7 +39,7 @@ func (r *secretRepository) Create(ctx context.Context, secret *ports.Secret) (*p
 		zap.String("title", secret.Title),
 	)
 
-	err := r.pool.QueryRow(ctx, query,
+	_, err := r.pool.Exec(ctx, query,
 		secret.ID,
 		secret.UserID,
 		secret.Type,
@@ -48,7 +48,7 @@ func (r *secretRepository) Create(ctx context.Context, secret *ports.Secret) (*p
 		secret.Metadata,
 		secret.CreatedAt,
 		secret.UpdatedAt,
-	).Scan(&secret.CreatedAt, &secret.UpdatedAt)
+	)
 
 	if err != nil {
 		r.logger.Error("failed to save secret", zap.Error(err))
@@ -76,7 +76,15 @@ func (r *secretRepository) GetByUserID(ctx context.Context, userID string) ([]*p
 	var secrets []*ports.Secret
 	for rows.Next() {
 		var s ports.Secret
-		if err := rows.Scan(&s.ID, &s.UserID, &s.Type, &s.Title, &s.Data, &s.Metadata, &s.CreatedAt, &s.UpdatedAt); err != nil {
+		if err := rows.Scan(&s.ID,
+			&s.UserID,
+			&s.Type,
+			&s.Title,
+			&s.Data,
+			&s.Metadata,
+			&s.CreatedAt,
+			&s.UpdatedAt,
+		); err != nil {
 			return nil, err
 		}
 		secrets = append(secrets, &s)
@@ -98,7 +106,14 @@ func (r *secretRepository) GetSecret(ctx context.Context, id, userID string) (*p
 
 	var s ports.Secret
 	err := r.pool.QueryRow(ctx, query, id, userID).Scan(
-		&s.ID, &s.UserID, &s.Type, &s.Title, &s.Data, &s.Metadata, &s.CreatedAt, &s.UpdatedAt,
+		&s.ID,
+		&s.UserID,
+		&s.Type,
+		&s.Title,
+		&s.Data,
+		&s.Metadata,
+		&s.CreatedAt,
+		&s.UpdatedAt,
 	)
 
 	if err == pgx.ErrNoRows {

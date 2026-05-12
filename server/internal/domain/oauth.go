@@ -1,5 +1,10 @@
 package domain
 
+const (
+	ProviderGoogle = "google"
+	ProviderYandex = "yandex"
+)
+
 type OAuthUserInfo struct {
 	Provider   string `json:"provider"`
 	ProviderID string `json:"provider_id"`

@@ -36,6 +36,12 @@ type ServerConfig struct {
 	GRPCPort string
 	Env      string
 	Debug    bool
+
+	// Таймауты HTTP-сервера
+	ReadTimeout     time.Duration `json:"read_timeout"`
+	WriteTimeout    time.Duration `json:"write_timeout"`
+	IdleTimeout     time.Duration `json:"idle_timeout"`
+	ShutdownTimeout time.Duration `json:"shutdown_timeout"`
 }
 
 type DatabaseConfig struct {
@@ -118,10 +124,14 @@ func newWithFlags(fs *flag.FlagSet) (*Config, error) {
 func defaultConfig() *Config {
 	return &Config{
 		Server: ServerConfig{
-			Port:     "8080",
-			GRPCPort: "9090",
-			Env:      "development",
-			Debug:    false,
+			Port:            "8080",
+			GRPCPort:        "9090",
+			Env:             "development",
+			Debug:           false,
+			ReadTimeout:     15 * time.Second,
+			WriteTimeout:    30 * time.Second,
+			IdleTimeout:     60 * time.Second,
+			ShutdownTimeout: 10 * time.Second,
 		},
 		Database: DatabaseConfig{
 			DSN:               "postgres://postgres:supersecretpassword123@localhost:5433/gophkeeper?sslmode=disable",
@@ -183,6 +193,26 @@ func overwriteFromEnv(cfg *Config) {
 	}
 	if v := os.Getenv("PPROF_PORT"); v != "" {
 		cfg.Pprof.Port = v
+	}
+	if v := os.Getenv("SERVER_READ_TIMEOUT"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			cfg.Server.ReadTimeout = d
+		}
+	}
+	if v := os.Getenv("SERVER_WRITE_TIMEOUT"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			cfg.Server.WriteTimeout = d
+		}
+	}
+	if v := os.Getenv("SERVER_IDLE_TIMEOUT"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			cfg.Server.IdleTimeout = d
+		}
+	}
+	if v := os.Getenv("SERVER_SHUTDOWN_TIMEOUT"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			cfg.Server.ShutdownTimeout = d
+		}
 	}
 	// DB
 	if v := os.Getenv("DB_DSN"); v != "" {

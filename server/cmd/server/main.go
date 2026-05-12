@@ -8,8 +8,8 @@ import (
 	"go.uber.org/zap"
 	"gophkeeper/server/internal/adapters/auth"
 	"gophkeeper/server/internal/adapters/protocol/grpc"
+	"gophkeeper/server/internal/adapters/protocol/rest"
 	"gophkeeper/server/internal/adapters/protocol/rest/handler"
-	"gophkeeper/server/internal/adapters/protocol/rest/middleware"
 	"gophkeeper/server/internal/adapters/secret"
 	"gophkeeper/server/internal/adapters/storage/postgres"
 	"gophkeeper/server/internal/config"
@@ -93,9 +93,15 @@ func main() {
 
 	// UseCases
 	authUserCase := domain.NewAuthUseCase(oauthAdapter, log)
+	if authUserCase == nil {
+		log.Error("failed to create AuthUseCase")
+	}
 	secretUseCase := domain.NewSecretUseCase(secretAdapter, domain.JWTValidatorAdapter{
 		ValidateFunc: passwordAdapter.ValidateJWT,
 	})
+	if secretUseCase == nil {
+		log.Error("failed to create SecretUseCase")
+	}
 
 	log.Info("All layers initialized successfully")
 
@@ -108,35 +114,22 @@ func main() {
 	}
 
 	// Роуты
-	r := gin.Default()
-
-	// Публичные роуты
-	pub := r.Group("/")
-	pub.POST("/register", handler.Register(authUserCase, log))
-	pub.POST("/login", handler.Login(authUserCase, log))
-	oauthHandler := handler.NewOAuthHandler(authUserCase)
-
-	pub.GET("/auth/:provider/login", oauthHandler.OAuthLogin)
-	pub.GET("/auth/:provider/callback", oauthHandler.OAuthCallback)
-
-	pub.GET("/ping", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
-	})
-
-	// Защищенные роуты
-	protect := r.Group("/")
-	protect.Use(middleware.AuthMiddleware(passwordAdapter.ValidateJWT, log))
-	protect.GET("/profile", handler.Profile(log))
-
-	protect.POST("/secrets", handler.CreateSecret(secretUseCase, log))
-	protect.GET("/secrets", handler.GetSecrets(secretUseCase, log))
-	protect.GET("/secrets/:id", handler.GetSecret(secretUseCase, log))
-	protect.DELETE("/secrets/:id", handler.DeleteSecret(secretUseCase, log))
+	r := rest.NewRouter(
+		authUserCase,
+		secretUseCase,
+		handler.NewOAuthHandler(authUserCase, log),
+		passwordAdapter.ValidateJWT,
+		log,
+	)
 
 	// HTTP + pprof
 	srv := &http.Server{
-		Addr:    ":" + cfg.Server.Port,
-		Handler: r,
+		Addr:           ":" + cfg.Server.Port,
+		Handler:        r,
+		ReadTimeout:    cfg.Server.ReadTimeout,
+		WriteTimeout:   cfg.Server.WriteTimeout,
+		IdleTimeout:    cfg.Server.IdleTimeout,
+		MaxHeaderBytes: 1 << 20,
 	}
 
 	pprofSrv := &http.Server{

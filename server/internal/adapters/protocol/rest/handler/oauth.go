@@ -2,23 +2,33 @@ package handler
 
 import (
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 	"gophkeeper/server/internal/domain"
+	"gophkeeper/server/internal/logger"
 	"net/http"
 	"strings"
 )
 
 type OAuthHandler struct {
 	useCase *domain.AuthUseCase
+	log     logger.Logger
 }
 
-func NewOAuthHandler(useCase *domain.AuthUseCase) *OAuthHandler {
-	return &OAuthHandler{useCase: useCase}
+func NewOAuthHandler(useCase *domain.AuthUseCase, log logger.Logger) *OAuthHandler {
+	return &OAuthHandler{
+		useCase: useCase,
+		log:     log,
+	}
 }
 
 func (h *OAuthHandler) OAuthLogin(c *gin.Context) {
 	provider := strings.ToLower(c.Param("provider"))
-	if provider != "google" && provider != "yandex" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "unknown provider"})
+
+	switch provider {
+	case domain.ProviderGoogle, domain.ProviderYandex:
+	default:
+		h.log.Info("unsupported oauth provider", zap.String("provider", provider))
+		c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported provider"})
 		return
 	}
 

@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"fmt"
+	"errors"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"gophkeeper/server/internal/domain"
@@ -13,23 +13,13 @@ import (
 func CreateSecret(uc *domain.SecretUseCase, log logger.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		// Получение UserID из middleware
-		userIDInterface, exists := c.Get("user_id")
-		if !exists {
-			log.Warn("unauthorized request to create secret")
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "user not authenticated",
-			})
-		}
-
-		userID, ok := userIDInterface.(string)
-		if !ok || userID == "" {
-			log.Warn("invalid user_id in context")
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid user id in context"})
+		userID := getUserIDFromContext(c, log)
+		if userID == "" {
 			return
 		}
 
-		fmt.Printf("DEBUG: UserID = %s\n", userID)
+		log.Debug("DEBUG: UserID = %s\n", zap.String(
+			"userID", userID))
 
 		// Простой binding без строгой валидации
 		var req struct {
@@ -63,11 +53,14 @@ func CreateSecret(uc *domain.SecretUseCase, log logger.Logger) gin.HandlerFunc {
 			req.Data,
 		)
 		if err != nil {
-			log.Error("failed to create secret",
-				zap.String("user_id", userID),
-				zap.Error(err),
-			)
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			if errors.Is(err, domain.ErrInvalidInput) {
+				log.Warn("invalid secret input", zap.Error(err))
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid input"})
+				return
+			}
+
+			log.Error("failed to create secret", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 			return
 		}
 
@@ -86,17 +79,8 @@ func CreateSecret(uc *domain.SecretUseCase, log logger.Logger) gin.HandlerFunc {
 // GetSecrets — получение списка секретов пользователя
 func GetSecrets(uc *domain.SecretUseCase, log logger.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userIDInterface, exists := c.Get("user_id")
-		if !exists {
-			log.Warn("unauthorized attempt to get secrets")
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "user not authenticated"})
-			return
-		}
-
-		userID, ok := userIDInterface.(string)
-		if !ok || userID == "" {
-			log.Warn("invalid user_id in context")
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid user id in context"})
+		userID := getUserIDFromContext(c, log)
+		if userID == "" {
 			return
 		}
 
@@ -104,10 +88,12 @@ func GetSecrets(uc *domain.SecretUseCase, log logger.Logger) gin.HandlerFunc {
 
 		secrets, err := uc.GetSecrets(c.Request.Context(), userID)
 		if err != nil {
-			log.Error("failed to get secrets", zap.String("user_id", userID),
-				zap.Error(err))
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "internal server error"})
+			if errors.Is(err, domain.ErrInvalidInput) {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
+				return
+			}
+			log.Error("failed to get secrets", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 			return
 		}
 
@@ -193,21 +179,34 @@ func DeleteSecret(uc *domain.SecretUseCase, log logger.Logger) gin.HandlerFunc {
 				zap.String("user_id", userID),
 				zap.Error(err),
 			)
-			if err == domain.ErrNotFound {
+			if errors.Is(err, domain.ErrNotFound) || errors.Is(err, domain.ErrInvalidInput) {
 				c.JSON(http.StatusNotFound, gin.H{"error": "secret not found"})
 				return
 			}
+			log.Error("failed to delete secret", zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal server error"})
 			return
 		}
-
-		log.Info("secret deleted successfully",
-			zap.String("secret_id", id),
-			zap.String("user_id", userID),
-		)
-
-		c.JSON(http.StatusOK, gin.H{
-			"message": "secret deleted successfully",
-		})
+		c.JSON(http.StatusOK, gin.H{"message": "secret deleted successfully"})
 	}
+}
+
+func getUserIDFromContext(c *gin.Context, log logger.Logger) string {
+	userIDInterface, exists := c.Get("user_id")
+	if !exists {
+		log.Warn("unauthorized request - no user_id in context")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		c.Abort()
+		return ""
+	}
+
+	userID, ok := userIDInterface.(string)
+	if !ok || userID == "" {
+		log.Warn("invalid user_id in context")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		c.Abort()
+		return ""
+	}
+
+	return userID
 }
