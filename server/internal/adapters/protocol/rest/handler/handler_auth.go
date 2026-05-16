@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 	"gophkeeper/server/internal/domain"
 	"gophkeeper/server/internal/logger"
+	"gophkeeper/server/internal/ports"
 	"net/http"
 )
 
@@ -17,7 +18,7 @@ import (
 //
 // Принимает email и password, валидирует их через gin binding,
 // вызывает AuthUseCase.Register и возвращает userID.
-func Register(uc *domain.AuthUseCase, log logger.Logger) gin.HandlerFunc {
+func Register(uc ports.AuthPort, log logger.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
 			Email    string `json:"email" binding:"required,email"`
@@ -64,7 +65,7 @@ func Register(uc *domain.AuthUseCase, log logger.Logger) gin.HandlerFunc {
 // Login возвращает handler авторизации по email + password.
 //
 // При успешном логине возвращает JWT-токен.
-func Login(uc *domain.AuthUseCase, log logger.Logger) gin.HandlerFunc {
+func Login(uc ports.AuthPort, log logger.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
 			Email    string `json:"email" binding:"required,email"`
@@ -115,7 +116,7 @@ func Login(uc *domain.AuthUseCase, log logger.Logger) gin.HandlerFunc {
 func Profile(log logger.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Извлекаем userID, который положил middleware
-		userID, exist := c.Get("userID")
+		userIDInterface, exist := c.Get("userID")
 		if !exist {
 			log.Warn("profile request without user_id in context")
 			c.JSON(http.StatusUnauthorized, gin.H{
@@ -123,13 +124,20 @@ func Profile(log logger.Logger) gin.HandlerFunc {
 			return
 		}
 
-		uid, _ := userID.(string)
+		uid, ok := userIDInterface.(string)
+		if !ok || uid == "" {
+			log.Warn("invalid user id in context", zap.Any("got", userIDInterface))
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error": "userID not found in context",
+			})
+
+		}
 
 		log.Info("profile accessed successfully", zap.String("user_id", uid))
 
 		c.JSON(http.StatusOK, gin.H{
 			"message": "protected route accessed successfully",
-			"userID":  userID,
+			"userID":  uid,
 		})
 	}
 }

@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-type SecretType string
+type SecretType = ports.SecretType
 
 // TokenValidator — интерфейс для валидации токена. Используется в middleware
 type TokenValidator interface {

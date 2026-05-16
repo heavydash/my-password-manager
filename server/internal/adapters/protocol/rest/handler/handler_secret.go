@@ -6,11 +6,12 @@ import (
 	"go.uber.org/zap"
 	"gophkeeper/server/internal/domain"
 	"gophkeeper/server/internal/logger"
+	"gophkeeper/server/internal/ports"
 	"net/http"
 )
 
 // CreateSecret — создание нового секрета
-func CreateSecret(uc *domain.SecretUseCase, log logger.Logger) gin.HandlerFunc {
+func CreateSecret(uc ports.SecretUseCase, log logger.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		userID := getUserIDFromContext(c, log)
@@ -42,7 +43,7 @@ func CreateSecret(uc *domain.SecretUseCase, log logger.Logger) gin.HandlerFunc {
 		)
 
 		// Конвертация string → SecretType
-		secretType := domain.SecretType(req.Type)
+		secretType := ports.SecretType(req.Type)
 
 		// Создаём секрет
 		secret, err := uc.CreateSecret(
@@ -77,7 +78,7 @@ func CreateSecret(uc *domain.SecretUseCase, log logger.Logger) gin.HandlerFunc {
 }
 
 // GetSecrets — получение списка секретов пользователя
-func GetSecrets(uc *domain.SecretUseCase, log logger.Logger) gin.HandlerFunc {
+func GetSecrets(uc ports.SecretUseCase, log logger.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := getUserIDFromContext(c, log)
 		if userID == "" {
@@ -108,7 +109,7 @@ func GetSecrets(uc *domain.SecretUseCase, log logger.Logger) gin.HandlerFunc {
 	}
 }
 
-func GetSecret(uc *domain.SecretUseCase, log logger.Logger) gin.HandlerFunc {
+func GetSecret(uc ports.SecretUseCase, log logger.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
 		userID := c.GetString("user_id")
@@ -153,7 +154,7 @@ func GetSecret(uc *domain.SecretUseCase, log logger.Logger) gin.HandlerFunc {
 }
 
 // DeleteSecret - Удаление секрета
-func DeleteSecret(uc *domain.SecretUseCase, log logger.Logger) gin.HandlerFunc {
+func DeleteSecret(uc ports.SecretUseCase, log logger.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
 		userID := c.GetString("user_id")

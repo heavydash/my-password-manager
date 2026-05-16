@@ -249,7 +249,21 @@ func (a *passwordAdapter) HandleCallback(provider, code, state string) (string, 
 	return "", fmt.Errorf("OAuth callback not implemented")
 }
 
+func (a *passwordAdapter) HandleOAuthCallback(provider, state, code string) (string, error) {
+	return "", fmt.Errorf("password adapter does not support OAuth")
+}
+
 // GenerateJWT делегирует генерацию JWT (экспортированный обёртка).
 func (a *passwordAdapter) GenerateJWT(userID string) (string, error) {
 	return a.generateJWT(userID)
+}
+
+// Register делегирует регистрацию
+func (a *passwordAdapter) Register(ctx context.Context, email, password string) (string, error) {
+	return a.Register(ctx, email, password)
+}
+
+// LoginPassword делегирует логгирование по паролю
+func (a *passwordAdapter) LoginPassword(ctx context.Context, email, password string) (string, string, error) {
+	return a.LoginPassword(ctx, email, password)
 }

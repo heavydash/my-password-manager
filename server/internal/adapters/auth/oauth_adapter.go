@@ -268,6 +268,11 @@ func (a *OAuthAdapter) GetUserByID(ctx context.Context, id string) (ports.User, 
 	return a.authPort.GetUserByID(ctx, id)
 }
 
+// HandleOAuthCallback
+func (a *OAuthAdapter) HandleOAuthCallback(provider, code, state string) (string, error) {
+	return a.HandleOAuthCallback(provider, code, state)
+}
+
 // ValidateJWT делегирует валидацию JWT.
 func (a *OAuthAdapter) ValidateJWT(tokenString string) (string, error) {
 	return a.authPort.ValidateJWT(tokenString)
@@ -276,6 +281,16 @@ func (a *OAuthAdapter) ValidateJWT(tokenString string) (string, error) {
 // GenerateJWT делегирует генерацию JWT.
 func (a *OAuthAdapter) GenerateJWT(userID string) (string, error) {
 	return a.authPort.GenerateJWT(userID)
+}
+
+// Register делегирует регистрацию
+func (a *OAuthAdapter) Register(ctx context.Context, email, password string) (string, error) {
+	return a.Register(ctx, email, password)
+}
+
+// LoginPassword делегирует логгирование по паролю
+func (a *OAuthAdapter) LoginPassword(ctx context.Context, email, password string) (string, string, error) {
+	return a.LoginPassword(ctx, email, password)
 }
 
 // getString — вспомогательная функция для безопасного извлечения строки из map.

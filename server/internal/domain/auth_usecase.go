@@ -144,3 +144,31 @@ func (u *AuthUseCase) LoginOAuth(ctx context.Context, oneTimeCode string) (strin
 	}
 	return token, nil
 }
+
+func (u *AuthUseCase) CreateUser(ctx context.Context, user ports.User) (string, error) {
+	return u.authPort.CreateUser(ctx, user)
+}
+
+func (u *AuthUseCase) AuthenticatePassword(ctx context.Context, email, password string) (string, string, error) {
+	return u.authPort.AuthenticatePassword(ctx, email, password)
+}
+
+func (u *AuthUseCase) GetUserByID(ctx context.Context, id string) (ports.User, error) {
+	return u.authPort.GetUserByID(ctx, id)
+}
+
+func (u *AuthUseCase) ValidateJWT(tokenString string) (string, error) {
+	return u.authPort.ValidateJWT(tokenString)
+}
+
+func (u *AuthUseCase) GenerateJWT(userID string) (string, error) {
+	return u.authPort.GenerateJWT(userID)
+}
+
+func (u *AuthUseCase) AuthenticateOAuth(ctx context.Context, oneTimeCode string) (string, error) {
+	return u.authPort.AuthenticateOAuth(ctx, oneTimeCode)
+}
+
+func (u *AuthUseCase) HandleCallback(provider, code, state string) (string, error) {
+	return u.authPort.HandleCallback(provider, code, state)
+}

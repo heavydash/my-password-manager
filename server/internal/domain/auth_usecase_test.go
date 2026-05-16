@@ -10,7 +10,19 @@ import (
 	"testing"
 )
 
-type mockAuthPort struct{ mock.Mock }
+type mockAuthPort struct {
+	mock.Mock
+}
+
+func (m *mockAuthPort) Register(ctx context.Context, email, password string) (string, error) {
+	args := m.Called(ctx, email, password)
+	return args.String(0), args.Error(1)
+}
+
+func (m *mockAuthPort) LoginPassword(ctx context.Context, email, password string) (string, string, error) {
+	args := m.Called(ctx, email, password)
+	return args.String(0), args.String(1), args.Error(2)
+}
 
 func (m *mockAuthPort) CreateUser(ctx context.Context, user ports.User) (string, error) {
 	args := m.Called(ctx, user)
@@ -28,6 +40,11 @@ func (m *mockAuthPort) GetOAuthURL(provider string) (string, string, error) {
 }
 
 func (m *mockAuthPort) HandleCallback(provider, code, state string) (string, error) {
+	args := m.Called(provider, code, state)
+	return args.String(0), args.Error(1)
+}
+
+func (m *mockAuthPort) HandleOAuthCallback(provider, code, state string) (string, error) {
 	args := m.Called(provider, code, state)
 	return args.String(0), args.Error(1)
 }
@@ -127,7 +144,7 @@ func TestAuthUseCase_LoginPassword(t *testing.T) {
 			name:     "empty credentials",
 			email:    "",
 			password: "",
-			wantErr:  "email or password is required",
+			wantErr:  "invalid input",
 		},
 		{
 			name:     "invalid credentials",

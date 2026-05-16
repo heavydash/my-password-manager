@@ -5,16 +5,17 @@ import (
 	"go.uber.org/zap"
 	"gophkeeper/server/internal/domain"
 	"gophkeeper/server/internal/logger"
+	"gophkeeper/server/internal/ports"
 	"net/http"
 	"strings"
 )
 
 type OAuthHandler struct {
-	useCase *domain.AuthUseCase
+	useCase ports.AuthPort
 	log     logger.Logger
 }
 
-func NewOAuthHandler(useCase *domain.AuthUseCase, log logger.Logger) *OAuthHandler {
+func NewOAuthHandler(useCase ports.AuthPort, log logger.Logger) *OAuthHandler {
 	return &OAuthHandler{
 		useCase: useCase,
 		log:     log,

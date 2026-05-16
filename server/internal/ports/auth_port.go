@@ -11,6 +11,12 @@ import (
 //
 // Реализуется адаптерами: passwordAdapter и OAuthAdapter.
 type AuthPort interface {
+
+	// Методы, которые используются в REST handlers
+	Register(ctx context.Context, email, password string) (string, error)
+
+	LoginPassword(ctx context.Context, email, password string) (token string, userID string, err error)
+
 	// CreateUser создаёт пользователя в хранилище.
 	CreateUser(ctx context.Context, user User) (string, error)
 	// AuthenticatePassword выполняет проверку email + пароль.
@@ -29,6 +35,7 @@ type AuthPort interface {
 
 	// HandleCallback обрабатывает callback от OAuth-провайдера.
 	HandleCallback(provider, code, state string) (oneTimeCode string, err error)
+	HandleOAuthCallback(provider, code, state string) (string, error)
 
 	// AuthenticateOAuth завершает OAuth-flow по one-time code.
 	AuthenticateOAuth(ctx context.Context, oneTimeCode string) (token string, err error)
