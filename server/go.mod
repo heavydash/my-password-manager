@@ -3,17 +3,18 @@ module gophkeeper/server
 go 1.25.7
 
 require (
-	github.com/DATA-DOG/go-sqlmock v1.5.2
-	github.com/bytedance/gopkg v0.1.3
 	github.com/gin-gonic/gin v1.12.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/google/uuid v1.6.0
 	github.com/gostaticanalysis/nilerr v0.1.2
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/joho/godotenv v1.5.1
 	github.com/kisielk/errcheck v1.10.0
 	github.com/lib/pq v1.12.3
+	github.com/pashagolub/pgxmock/v5 v5.1.0
 	github.com/pressly/goose/v3 v3.27.1
 	github.com/stretchr/testify v1.11.1
+	go.uber.org/mock v0.6.0
 	go.uber.org/zap v1.28.0
 	golang.org/x/crypto v0.50.0
 	golang.org/x/oauth2 v0.34.0
@@ -25,6 +26,7 @@ require (
 
 require (
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
+	github.com/bytedance/gopkg v0.1.3 // indirect
 	github.com/bytedance/sonic v1.15.0 // indirect
 	github.com/bytedance/sonic/loader v0.5.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect

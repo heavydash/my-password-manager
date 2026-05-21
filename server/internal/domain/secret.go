@@ -10,7 +10,17 @@ import (
 	"time"
 )
 
+// SecretType — тип секрета.
 type SecretType = ports.SecretType
+
+// Константы типов секретов
+const (
+	SecretTypePassword SecretType = "password"
+	SecretTypeNote     SecretType = "note"
+	SecretTypeCard     SecretType = "card"
+	SecretTypeSSHKey   SecretType = "ssh_key"
+	SecretTypeCustom   SecretType = "custom"
+)
 
 // TokenValidator — интерфейс для валидации токена. Используется в middleware
 type TokenValidator interface {
@@ -22,13 +32,10 @@ type JWTValidatorAdapter struct {
 	ValidateFunc func(token string) (string, error)
 }
 
-const (
-	SecretTypePassword SecretType = "password"
-	SecretTypeNote     SecretType = "note"
-	SecretTypeCard     SecretType = "card"
-	SecretTypeSSHKey   SecretType = "ssh_key"
-	SecretTypeCustom   SecretType = "custom"
-)
+// ValidateToken делегирует вызов функции-валидатора.
+func (a JWTValidatorAdapter) ValidateToken(token string) (string, error) {
+	return a.ValidateFunc(token)
+}
 
 // NewSecret создаёт новую доменную сущность секрета.
 //
@@ -36,7 +43,7 @@ const (
 //   - userID, title, encryptedData не пустые
 //   - secretType — один из разрешённых
 //
-// Возвращает готовый *ports.Secret с заполненными CreatedAt/UpdatedAt и ID.
+// Возвращает готовый *Secret с заполненными CreatedAt/UpdatedAt и ID.
 func NewSecret(userID string, secretType SecretType, title string, encryptedData string) (*ports.Secret, error) {
 	if userID == "" {
 		return nil, ErrInvalidInput
@@ -77,11 +84,4 @@ func NewSecret(userID string, secretType SecretType, title string, encryptedData
 // Используется только внутри пакета. В production рекомендуется заменить на UUID.
 func generateID() string {
 	return time.Now().UTC().Format("20060102150405")
-}
-
-// ValidateToken делегирует вызов функции-валидатора.
-//
-// Реализация JWTValidatorAdapter для удобства тестирования.
-func (a JWTValidatorAdapter) ValidateToken(token string) (string, error) {
-	return a.ValidateFunc(token)
 }

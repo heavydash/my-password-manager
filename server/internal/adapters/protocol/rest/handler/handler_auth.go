@@ -2,6 +2,11 @@
 //
 // Все handlers являются фабриками (возвращают gin.HandlerFunc), чтобы можно было
 // легко внедрять зависимости (UseCase, Logger).
+//
+// Содержит:
+//   - Register: регистрация пользователя
+//   - Login: вход по email/паролю
+//   - Profile: защищённый эндпоинт для проверки аутентификации
 package handler
 
 import (
@@ -14,10 +19,29 @@ import (
 	"net/http"
 )
 
+// Константы для ключей контекста Gin
+const (
+	ginUserIDKey = "userID"
+)
+
 // Register возвращает handler регистрации пользователя.
 //
 // Принимает email и password, валидирует их через gin binding,
 // вызывает AuthUseCase.Register и возвращает userID.
+//
+// Пример запроса:
+//
+//	POST /api/v1/auth/register
+//	{
+//	    "email": "user@example.com",
+//	    "password": "securepassword123"
+//	}
+//
+// Ответы:
+//   - 201 Created: успешная регистрация
+//   - 400 Bad Request: невалидные данные
+//   - 409 Conflict: пользователь уже существует
+//   - 500 Internal Server Error: внутренняя ошибка
 func Register(uc ports.AuthPort, log logger.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
@@ -40,7 +64,7 @@ func Register(uc ports.AuthPort, log logger.Logger) gin.HandlerFunc {
 			if errors.Is(err, domain.ErrUserAlreadyExists) {
 				log.Warn("registration failed: user already exists",
 					zap.String("email", req.Email))
-				c.JSON(http.StatusConflict, gin.H{"error:": "user with this email already exists"})
+				c.JSON(http.StatusConflict, gin.H{"error": "user with this email already exists"})
 				return
 			}
 			log.Error("registration failed", zap.String("email", req.Email),
@@ -65,6 +89,20 @@ func Register(uc ports.AuthPort, log logger.Logger) gin.HandlerFunc {
 // Login возвращает handler авторизации по email + password.
 //
 // При успешном логине возвращает JWT-токен.
+//
+// Пример запроса:
+//
+//	POST /api/v1/auth/login
+//	{
+//	    "email": "user@example.com",
+//	    "password": "securepassword123"
+//	}
+//
+// Ответы:
+//   - 200 OK: успешный вход, возвращает token и user_id
+//   - 400 Bad Request: невалидные данные
+//   - 401 Unauthorized: неверные учётные данные
+//   - 500 Internal Server Error: внутренняя ошибка
 func Login(uc ports.AuthPort, log logger.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
@@ -110,13 +148,18 @@ func Login(uc ports.AuthPort, log logger.Logger) gin.HandlerFunc {
 	}
 }
 
-// Profile — защищённый эндпоинт.
+// Profile — защищённый эндпоинт для проверки аутентификации.
 //
 // Ожидает, что middleware ранее положил `userID` в контекст Gin.
+// Используется для проверки работоспособности JWT-аутентификации.
+//
+// Ответы:
+//   - 200 OK: пользователь аутентифицирован
+//   - 401 Unauthorized: user_id отсутствует в контексте
 func Profile(log logger.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Извлекаем userID, который положил middleware
-		userIDInterface, exist := c.Get("userID")
+		userIDInterface, exist := c.Get(ginUserIDKey)
 		if !exist {
 			log.Warn("profile request without user_id in context")
 			c.JSON(http.StatusUnauthorized, gin.H{
@@ -124,20 +167,20 @@ func Profile(log logger.Logger) gin.HandlerFunc {
 			return
 		}
 
-		uid, ok := userIDInterface.(string)
-		if !ok || uid == "" {
+		userID, ok := userIDInterface.(string)
+		if !ok || userID == "" {
 			log.Warn("invalid user id in context", zap.Any("got", userIDInterface))
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"error": "userID not found in context",
 			})
-
+			return
 		}
 
-		log.Info("profile accessed successfully", zap.String("user_id", uid))
+		log.Info("profile accessed successfully", zap.String("user_id", userID))
 
 		c.JSON(http.StatusOK, gin.H{
 			"message": "protected route accessed successfully",
-			"userID":  uid,
+			"userID":  userID,
 		})
 	}
 }

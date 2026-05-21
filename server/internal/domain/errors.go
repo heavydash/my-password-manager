@@ -1,3 +1,8 @@
+// Package domain содержит бизнес-логику GophKeeper.
+//
+// Содержит:
+//   - Ошибки домена (ErrInvalidCredentials, ErrUserAlreadyExists и т.д.)
+//   - Константы провайдеров (ProviderPassword, ProviderGoogle, ProviderYandex)
 package domain
 
 import "errors"
@@ -28,4 +33,8 @@ var (
 	ErrInvalidInput = errors.New("invalid input")
 	ErrNotFound     = errors.New("not found")
 	ErrInternal     = errors.New("internal error")
+
+	// Migration errors
+	// ErrMigrationTimeout — таймаут при выполнении миграций
+	ErrMigrationTimeout = errors.New("migration timeout or context cancelled")
 )

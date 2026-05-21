@@ -12,11 +12,10 @@ import (
 // Реализуется адаптерами: passwordAdapter и OAuthAdapter.
 type AuthPort interface {
 
-	// Методы, которые используются в REST handlers
+	// Register регистрирует нового пользователя.
 	Register(ctx context.Context, email, password string) (string, error)
-
+	// LoginPassword выполняет вход по email и паролю.
 	LoginPassword(ctx context.Context, email, password string) (token string, userID string, err error)
-
 	// CreateUser создаёт пользователя в хранилище.
 	CreateUser(ctx context.Context, user User) (string, error)
 	// AuthenticatePassword выполняет проверку email + пароль.
@@ -27,16 +26,13 @@ type AuthPort interface {
 	ValidateJWT(tokenString string) (string, error)
 	// GenerateJWT генерирует новый JWT-токен.
 	GenerateJWT(userID string) (string, error)
-
-	// Новые OAuth-методы
-
 	// GetOAuthURL возвращает URL для редиректа на провайдера и state.
 	GetOAuthURL(provider string) (authURL, state string, err error)
-
 	// HandleCallback обрабатывает callback от OAuth-провайдера.
-	HandleCallback(provider, code, state string) (oneTimeCode string, err error)
+	// HandleOAuthCallback обрабатывает callback от OAuth-провайдера.
+	// Возвращает временный код для последующего обмена на JWT.
+	HandleCallback(provider, code, state string) (tempCode string, err error)
 	HandleOAuthCallback(provider, code, state string) (string, error)
-
-	// AuthenticateOAuth завершает OAuth-flow по one-time code.
-	AuthenticateOAuth(ctx context.Context, oneTimeCode string) (token string, err error)
+	// AuthenticateOAuth завершает OAuth-flow по временному коду.
+	AuthenticateOAuth(ctx context.Context, code string) (token string, err error)
 }

@@ -71,6 +71,7 @@ type mockLogger struct{ mock.Mock }
 func (m *mockLogger) Info(msg string, fields ...zap.Field)   {}
 func (m *mockLogger) Warn(msg string, fields ...zap.Field)   {}
 func (m *mockLogger) Error(msg string, fields ...zap.Field)  {}
+func (m *mockLogger) Fatal(msg string, fields ...zap.Field)  {}
 func (m *mockLogger) Debug(msg string, fields ...zap.Field)  {}
 func (m *mockLogger) With(fields ...zap.Field) logger.Logger { return m }
 func (m *mockLogger) Sync() error                            { return nil }

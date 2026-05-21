@@ -1,6 +1,12 @@
+// Package domain содержит тесты для бизнес-логики GophKeeper.
+//
+// Тестируются:
+//   - NewSecret: создание доменной сущности секрета
+//   - JWTValidatorAdapter: адаптер для валидации JWT
 package domain
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -22,6 +28,14 @@ func TestNewSecret(t *testing.T) {
 			encryptedData: "base64data123==",
 		},
 		{
+			name:          "success note",
+			userID:        "user-123",
+			secretType:    SecretTypeNote,
+			title:         "My note",
+			encryptedData: "note data",
+			wantErr:       nil,
+		},
+		{
 			name:       "empty userID",
 			userID:     "",
 			secretType: SecretTypeNote,
@@ -37,12 +51,20 @@ func TestNewSecret(t *testing.T) {
 			wantErr:       ErrInvalidInput,
 		},
 		{
+			name:          "empty data",
+			userID:        "user-123",
+			secretType:    SecretTypeCard,
+			title:         "Card",
+			encryptedData: "",
+			wantErr:       ErrInvalidInput,
+		},
+		{
 			name:          "invalid secret type",
 			userID:        "user-123",
-			secretType:    "unknown",
+			secretType:    SecretType("unknown"),
 			title:         "Test",
 			encryptedData: "data",
-			wantErr:       nil, // проверяем через assert.Contains ниже
+			wantErr:       fmt.Errorf("unknown secret type: unknown"),
 		},
 	}
 
@@ -51,13 +73,10 @@ func TestNewSecret(t *testing.T) {
 			secret, err := NewSecret(tt.userID, tt.secretType, tt.title, tt.encryptedData)
 
 			if tt.wantErr != nil {
-				assert.ErrorIs(t, err, tt.wantErr)
-				return
-			}
-
-			if tt.secretType == "unknown" {
 				assert.Error(t, err)
-				assert.Contains(t, err.Error(), "unknown secret type")
+				if tt.wantErr.Error() != "" {
+					assert.Contains(t, err.Error(), tt.wantErr.Error())
+				}
 				return
 			}
 
@@ -73,6 +92,7 @@ func TestNewSecret(t *testing.T) {
 }
 
 func TestJWTValidatorAdapter(t *testing.T) {
+	// Создание адаптера с тестовой функцией валидации
 	adapter := JWTValidatorAdapter{
 		ValidateFunc: func(token string) (string, error) {
 			if token == "valid" {
@@ -82,10 +102,12 @@ func TestJWTValidatorAdapter(t *testing.T) {
 		},
 	}
 
+	// Успешная валидация
 	userID, err := adapter.ValidateToken("valid")
 	assert.NoError(t, err)
 	assert.Equal(t, "user-123", userID)
 
+	// Неуспешная валидация
 	_, err = adapter.ValidateToken("invalid")
 	assert.ErrorIs(t, err, ErrTokenInvalid)
 }

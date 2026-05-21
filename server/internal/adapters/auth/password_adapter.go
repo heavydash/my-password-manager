@@ -15,6 +15,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/argon2"
+	"gophkeeper/server/internal/config"
 	"gophkeeper/server/internal/domain"
 	"gophkeeper/server/internal/logger"
 	"gophkeeper/server/internal/ports"
@@ -27,31 +28,45 @@ import (
 // Использует Argon2 для хеширования паролей и JWT (HS256) для токенов.
 // Хранит пользователей через StoragePort.
 type passwordAdapter struct {
-	storage   ports.StoragePort
-	jwtSecret []byte
-	logger    logger.Logger
+	storage      ports.StoragePort
+	jwtSecret    []byte
+	jwtExpires   time.Duration
+	argon2Salt   []byte
+	argon2Iter   uint32
+	argon2Mem    uint32
+	argon2Par    uint8
+	argon2KeyLen uint32
+	logger       logger.Logger
 }
 
 // NewPasswordAdapter создаёт новый адаптер парольной аутентификации.
 //
 // Параметры:
-//   - storage   — порт для работы с хранилищем пользователей
-//   - jwtSecret — секрет для подписи JWT-токенов (должен быть длинным и случайным)
-//   - log       — логгер
+//   - storage: порт для работы с хранилищем пользователей
+//   - cfg: конфигурация JWT и Argon2
+//   - log: логгер
 //
 // Возвращает объект, реализующий ports.AuthPort.
-func NewPasswordAdapter(storage ports.StoragePort, jwtSecret string, log logger.Logger) ports.AuthPort {
+func NewPasswordAdapter(storage ports.StoragePort, cfg *config.Config, log logger.Logger) ports.AuthPort {
 	return &passwordAdapter{
-		storage:   storage,
-		jwtSecret: []byte(jwtSecret),
-		logger:    log,
+		storage:      storage,
+		jwtSecret:    []byte(cfg.JWT.Secret),
+		jwtExpires:   cfg.JWT.ExpiresIn,
+		argon2Salt:   []byte(cfg.Argon2.Salt),
+		argon2Iter:   cfg.Argon2.Iterations,
+		argon2Mem:    cfg.Argon2.Memory,
+		argon2Par:    cfg.Argon2.Parallelism,
+		argon2KeyLen: cfg.Argon2.KeyLen,
+		logger:       log,
 	}
 }
 
 // CreateUser создаёт нового пользователя.
 //
-// Преобразует ports.User в domain.User, хеширует пароль (если есть),
-// сохраняет через StoragePort.
+// Алгоритм:
+//  1. Хеширует пароль через Argon2 (если передан)
+//  2. Сохраняет пользователя через StoragePort
+//
 // Возвращает userID или domain.ErrUserAlreadyExists.
 func (a *passwordAdapter) CreateUser(ctx context.Context, user ports.User) (string,
 	error) {
@@ -180,8 +195,8 @@ func (a *passwordAdapter) generateJWT(userID string) (string, error) {
 
 	claims := jwt.MapClaims{
 		"user_ID": userID,
-		"exp":     now.Add(15 * time.Minute).Unix(), // Ограничение
-		"iat":     now.Unix(),                       // issued at - когда выдан
+		"exp":     now.Add(a.jwtExpires).Unix(), // Ограничение
+		"iat":     now.Unix(),                   // issued at - когда выдан
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -232,8 +247,13 @@ func (a *passwordAdapter) ValidateJWT(tokenString string) (string, error) {
 // Использует фиксированный salt "gophkeeper-salt" (в production рекомендуется рандомный).
 // Неэкспортированный метод.
 func (a *passwordAdapter) hashPassword(password string) string {
-	salt := []byte("gophkeeper-salt")
-	hash := argon2.IDKey([]byte(password), salt, 1, 64*1024, 4, 32)
+
+	hash := argon2.IDKey([]byte(password),
+		a.argon2Salt,
+		a.argon2Iter,
+		a.argon2Mem,
+		a.argon2Par,
+		a.argon2KeyLen)
 	return base64.URLEncoding.EncodeToString(hash)
 }
 
@@ -249,21 +269,34 @@ func (a *passwordAdapter) HandleCallback(provider, code, state string) (string, 
 	return "", fmt.Errorf("OAuth callback not implemented")
 }
 
+// HandleOAuthCallback обрабатывает OAuth callback (алиас для HandleCallback).
 func (a *passwordAdapter) HandleOAuthCallback(provider, state, code string) (string, error) {
 	return "", fmt.Errorf("password adapter does not support OAuth")
 }
 
-// GenerateJWT делегирует генерацию JWT (экспортированный обёртка).
+// GenerateJWT делегирует генерацию JWT (экспортированная обёртка).
 func (a *passwordAdapter) GenerateJWT(userID string) (string, error) {
 	return a.generateJWT(userID)
 }
 
-// Register делегирует регистрацию
+// Register создаёт нового пользователя по email и паролю.
 func (a *passwordAdapter) Register(ctx context.Context, email, password string) (string, error) {
-	return a.Register(ctx, email, password)
+	return a.CreateUser(ctx, ports.User{
+		Email:        email,
+		PasswordHash: password,
+		Provider:     "password",
+		ProviderID:   "",
+	})
 }
 
-// LoginPassword делегирует логгирование по паролю
+// ExchangeOneTimeCode обменивает one_time_code на AuthResponse.
+//
+// Для passwordAdapter возвращает ошибку (OAuth не поддерживается).
+func (a *passwordAdapter) ExchangeOneTimeCode(ctx context.Context, oneTimeCode string) (*domain.AuthResponse, error) {
+	return nil, domain.ErrOAuthUnavailable
+}
+
+// LoginPassword выполняет вход по email и паролю.
 func (a *passwordAdapter) LoginPassword(ctx context.Context, email, password string) (string, string, error) {
-	return a.LoginPassword(ctx, email, password)
+	return a.AuthenticatePassword(ctx, email, password)
 }

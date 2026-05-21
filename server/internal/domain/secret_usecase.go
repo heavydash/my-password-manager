@@ -1,3 +1,7 @@
+// Package domain содержит чистую бизнес-логику приложения.
+//
+// Здесь находятся сущности, usecases и ошибки домена.
+// Не зависит от БД, HTTP, фреймворков.
 package domain
 
 import (
@@ -38,21 +42,32 @@ func NewSecretUseCase(SecretPort ports.SecretPort, validator TokenValidator) *Se
 func (uc *SecretUseCase) CreateSecret(ctx context.Context, userID string, SecretType SecretType,
 	title string, encryptedDataBase64 string) (*ports.Secret, error) {
 
-	if userID == "" || title == "" || len(encryptedDataBase64) == 0 {
+	// Валидация обязательных полей
+	if userID == "" {
+		return nil, ErrInvalidInput
+	}
+	if title == "" {
+		return nil, ErrInvalidInput
+	}
+	if encryptedDataBase64 == "" {
 		return nil, ErrInvalidInput
 	}
 
+	// Валидация типа секрета (используем константы)
 	switch SecretType {
-	case "password", "note", "card", "ssh_key", "custom":
+	case SecretTypePassword, SecretTypeNote, SecretTypeCard, SecretTypeSSHKey, SecretTypeCustom:
+		// разрешённые типы
 	default:
 		return nil, ErrInvalidInput
 	}
 
+	// Создание доменной сущности
 	secret, err := NewSecret(userID, SecretType, title, encryptedDataBase64)
 	if err != nil {
 		return nil, err
 	}
 
+	// Сохранение через порт
 	createdSecret, err := uc.secretPort.Create(ctx, secret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create secret: %w", err)
@@ -78,6 +93,9 @@ func (uc *SecretUseCase) GetSecrets(ctx context.Context, userID string) ([]*port
 
 // GetSecret возвращает один секрет по ID.
 func (uc *SecretUseCase) GetSecret(ctx context.Context, id, userID string) (*ports.Secret, error) {
+	if id == "" || userID == "" {
+		return nil, ErrInvalidInput
+	}
 	return uc.secretPort.GetSecret(ctx, id, userID)
 }
 
