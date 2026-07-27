@@ -389,6 +389,120 @@ func (b0 LoginResponse_builder) Build() *LoginResponse {
 	return m0
 }
 
+type GetOAuthURLRequest struct {
+	state               protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_Provider string                 `protobuf:"bytes,1,opt,name=provider,proto3"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *GetOAuthURLRequest) Reset() {
+	*x = GetOAuthURLRequest{}
+	mi := &file_auth_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetOAuthURLRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetOAuthURLRequest) ProtoMessage() {}
+
+func (x *GetOAuthURLRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (x *GetOAuthURLRequest) GetProvider() string {
+	if x != nil {
+		return x.xxx_hidden_Provider
+	}
+	return ""
+}
+
+func (x *GetOAuthURLRequest) SetProvider(v string) {
+	x.xxx_hidden_Provider = v
+}
+
+type GetOAuthURLRequest_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	Provider string
+}
+
+func (b0 GetOAuthURLRequest_builder) Build() *GetOAuthURLRequest {
+	m0 := &GetOAuthURLRequest{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_Provider = b.Provider
+	return m0
+}
+
+type GetOAuthURLResponse struct {
+	state              protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_AuthUrl string                 `protobuf:"bytes,1,opt,name=auth_url,json=authUrl,proto3"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *GetOAuthURLResponse) Reset() {
+	*x = GetOAuthURLResponse{}
+	mi := &file_auth_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetOAuthURLResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetOAuthURLResponse) ProtoMessage() {}
+
+func (x *GetOAuthURLResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (x *GetOAuthURLResponse) GetAuthUrl() string {
+	if x != nil {
+		return x.xxx_hidden_AuthUrl
+	}
+	return ""
+}
+
+func (x *GetOAuthURLResponse) SetAuthUrl(v string) {
+	x.xxx_hidden_AuthUrl = v
+}
+
+type GetOAuthURLResponse_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	AuthUrl string
+}
+
+func (b0 GetOAuthURLResponse_builder) Build() *GetOAuthURLResponse {
+	m0 := &GetOAuthURLResponse{}
+	b, x := &b0, m0
+	_, _ = b, x
+	x.xxx_hidden_AuthUrl = b.AuthUrl
+	return m0
+}
+
 var File_auth_proto protoreflect.FileDescriptor
 
 const file_auth_proto_rawDesc = "" +
@@ -411,30 +525,39 @@ const file_auth_proto_rawDesc = "" +
 	"\rLoginResponse\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x18\n" +
-	"\amessage\x18\x03 \x01(\tR\amessage2\xea\x01\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\"0\n" +
+	"\x12GetOAuthURLRequest\x12\x1a\n" +
+	"\bprovider\x18\x01 \x01(\tR\bprovider\"0\n" +
+	"\x13GetOAuthURLResponse\x12\x19\n" +
+	"\bauth_url\x18\x01 \x01(\tR\aauthUrl2\xba\x02\n" +
 	"\vAuthService\x12E\n" +
 	"\bRegister\x12\x1b.gophkeeper.RegisterRequest\x1a\x1c.gophkeeper.RegisterResponse\x12L\n" +
 	"\rLoginPassword\x12 .gophkeeper.LoginPasswordRequest\x1a\x19.gophkeeper.LoginResponse\x12F\n" +
 	"\n" +
-	"LoginOAuth\x12\x1d.gophkeeper.LoginOAuthRequest\x1a\x19.gophkeeper.LoginResponseB$Z\"gophkeeper/server/proto/gophkeeperb\x06proto3"
+	"LoginOAuth\x12\x1d.gophkeeper.LoginOAuthRequest\x1a\x19.gophkeeper.LoginResponse\x12N\n" +
+	"\vGetOAuthURL\x12\x1e.gophkeeper.GetOAuthURLRequest\x1a\x1f.gophkeeper.GetOAuthURLResponseB$Z\"gophkeeper/server/proto/gophkeeperb\x06proto3"
 
-var file_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_auth_proto_goTypes = []any{
 	(*RegisterRequest)(nil),      // 0: gophkeeper.RegisterRequest
 	(*RegisterResponse)(nil),     // 1: gophkeeper.RegisterResponse
 	(*LoginPasswordRequest)(nil), // 2: gophkeeper.LoginPasswordRequest
 	(*LoginOAuthRequest)(nil),    // 3: gophkeeper.LoginOAuthRequest
 	(*LoginResponse)(nil),        // 4: gophkeeper.LoginResponse
+	(*GetOAuthURLRequest)(nil),   // 5: gophkeeper.GetOAuthURLRequest
+	(*GetOAuthURLResponse)(nil),  // 6: gophkeeper.GetOAuthURLResponse
 }
 var file_auth_proto_depIdxs = []int32{
 	0, // 0: gophkeeper.AuthService.Register:input_type -> gophkeeper.RegisterRequest
 	2, // 1: gophkeeper.AuthService.LoginPassword:input_type -> gophkeeper.LoginPasswordRequest
 	3, // 2: gophkeeper.AuthService.LoginOAuth:input_type -> gophkeeper.LoginOAuthRequest
-	1, // 3: gophkeeper.AuthService.Register:output_type -> gophkeeper.RegisterResponse
-	4, // 4: gophkeeper.AuthService.LoginPassword:output_type -> gophkeeper.LoginResponse
-	4, // 5: gophkeeper.AuthService.LoginOAuth:output_type -> gophkeeper.LoginResponse
-	3, // [3:6] is the sub-list for method output_type
-	0, // [0:3] is the sub-list for method input_type
+	5, // 3: gophkeeper.AuthService.GetOAuthURL:input_type -> gophkeeper.GetOAuthURLRequest
+	1, // 4: gophkeeper.AuthService.Register:output_type -> gophkeeper.RegisterResponse
+	4, // 5: gophkeeper.AuthService.LoginPassword:output_type -> gophkeeper.LoginResponse
+	4, // 6: gophkeeper.AuthService.LoginOAuth:output_type -> gophkeeper.LoginResponse
+	6, // 7: gophkeeper.AuthService.GetOAuthURL:output_type -> gophkeeper.GetOAuthURLResponse
+	4, // [4:8] is the sub-list for method output_type
+	0, // [0:4] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -451,7 +574,7 @@ func file_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_auth_proto_rawDesc), len(file_auth_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

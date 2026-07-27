@@ -50,11 +50,12 @@ func main() {
 	// Создаём логгер
 	log, err := logger.New(cfg)
 	if err != nil {
-		log.Error("Failed to create logger: %v", zap.Error(err))
+		fmt.Printf("Failed to create logger: %v", zap.Error(err))
 		os.Exit(1)
 	}
 	defer func() {
 		if err := log.Sync(); err != nil {
+			fmt.Printf("Failed to sync logger: %v", zap.Error(err))
 			panic(err)
 		}
 	}()
@@ -92,10 +93,11 @@ func main() {
 
 	// Создаем адаптеры
 	passwordAdapter := auth.NewPasswordAdapter(userRepository, cfg.JWT.Secret, log)
+	oauthAdapter := auth.NewOAuthAdapter(cfg.OAuth, dbPool.Pool, passwordAdapter)
 	secretAdapter := secret.NewSecretAdapter(secretRepository, log)
 
 	// UseCases
-	authUserCase := domain.NewAuthUseCase(passwordAdapter, log)
+	authUserCase := domain.NewAuthUseCase(oauthAdapter, log)
 	secretUseCase := domain.NewSecretUseCase(secretAdapter, domain.JWTValidatorAdapter{
 		ValidateFunc: passwordAdapter.ValidateJWT,
 	})
@@ -117,6 +119,14 @@ func main() {
 	pub := r.Group("/")
 	pub.POST("/register", handler.Register(authUserCase, log))
 	pub.POST("/login", handler.Login(authUserCase, log))
+	oauthHandler := handler.NewOAuthHandler(authUserCase)
+
+	pub.GET("/auth/:provider/login", oauthHandler.OAuthLogin)
+	pub.GET("/auth/:provider/callback", oauthHandler.OAuthCallback)
+
+	pub.GET("/ping", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
+	})
 
 	// Защищенные роуты
 	protect := r.Group("/")

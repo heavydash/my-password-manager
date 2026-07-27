@@ -18,6 +18,7 @@ type Config struct {
 	Database DatabaseConfig
 	JWT      JWTConfig
 	Pprof    PprofConfig
+	OAuth    OAuth
 	Debug    bool
 }
 
@@ -36,6 +37,19 @@ type DatabaseConfig struct {
 	MaxConnIdleTime   time.Duration `json:"max_conn_idle_time"`
 	HealthCheckPeriod time.Duration `json:"health_check_period"`
 	PingTimeout       time.Duration `json:"ping_timeout"`
+}
+
+type OAuth struct {
+	Google struct {
+		ClientID     string `json:"client_id"`
+		ClientSecret string `json:"client_secret"`
+		RedirectURL  string `json:"redirect_url"`
+	}
+	Yandex struct {
+		ClientID     string `json:"client_id"`
+		ClientSecret string `json:"client_secret"`
+		RedirectURL  string `json:"redirect_url"`
+	}
 }
 
 type JWTConfig struct {
@@ -66,6 +80,13 @@ func New() (*Config, error) {
 
 	// Переменные окружения (высший приоритет)
 	overwriteFromEnv(cfg)
+
+	if cfg.Server.Debug {
+		log.Printf("OAuth Google enabled: %t (ClientID present: %t)",
+			cfg.OAuth.Google.ClientID != "", cfg.OAuth.Google.ClientID != "")
+		log.Printf("OAuth Yandex enabled: %t", cfg.OAuth.Yandex.ClientID != "")
+
+	}
 
 	if err := cfg.Validate(); err != nil {
 		return nil, err
@@ -98,6 +119,18 @@ func defaultConfig() *Config {
 		Pprof: PprofConfig{
 			Port: "6060",
 		},
+		OAuth: OAuth{
+			Google: struct {
+				ClientID     string `json:"client_id"`
+				ClientSecret string `json:"client_secret"`
+				RedirectURL  string `json:"redirect_url"`
+			}{},
+			Yandex: struct {
+				ClientID     string `json:"client_id"`
+				ClientSecret string `json:"client_secret"`
+				RedirectURL  string `json:"redirect_url"`
+			}{},
+		},
 	}
 }
 
@@ -127,6 +160,9 @@ func overwriteFromEnv(cfg *Config) {
 	if v := os.Getenv("DEBUG"); v != "" {
 		cfg.Server.Debug = v == "true" || v == "1"
 	}
+	if v := os.Getenv("PPROF_PORT"); v != "" {
+		cfg.Pprof.Port = v
+	}
 	// DB
 	if v := os.Getenv("DB_DSN"); v != "" {
 		cfg.Database.DSN = v
@@ -140,8 +176,25 @@ func overwriteFromEnv(cfg *Config) {
 	if v := os.Getenv("JWT_SECRET"); v != "" {
 		cfg.JWT.Secret = v
 	}
-	if v := os.Getenv("PPROF_PORT"); v != "" {
-		cfg.Pprof.Port = v
+
+	// OAuth
+	if v := os.Getenv("OAUTH_GOOGLE_CLIENT_ID"); v != "" {
+		cfg.OAuth.Google.ClientID = v
+	}
+	if v := os.Getenv("OAUTH_GOOGLE_CLIENT_SECRET"); v != "" {
+		cfg.OAuth.Google.ClientSecret = v
+	}
+	if v := os.Getenv("OAUTH_GOOGLE_REDIRECT_URL"); v != "" {
+		cfg.OAuth.Google.RedirectURL = v
+	}
+	if v := os.Getenv("OAUTH_YANDEX_CLIENT_ID"); v != "" {
+		cfg.OAuth.Yandex.ClientID = v
+	}
+	if v := os.Getenv("OAUTH_YANDEX_CLIENT_SECRET"); v != "" {
+		cfg.OAuth.Yandex.ClientSecret = v
+	}
+	if v := os.Getenv("OAUTH_YANDEX_REDIRECT_URL"); v != "" {
+		cfg.OAuth.Yandex.RedirectURL = v
 	}
 }
 
@@ -159,6 +212,29 @@ func (c *Config) Validate() error {
 	}
 	if c.Database.DSN == "" {
 		return fmt.Errorf("DB_DSN is required")
+	}
+	if c.Database.MaxConns < 1 {
+		return fmt.Errorf("DB_MAX_CONNS must be at least 1")
+	}
+	if c.Database.MinConns < 1 {
+		return fmt.Errorf("DB_MIN_CONNS must be at least 1")
+	}
+	if c.Server.Port == "" {
+		return fmt.Errorf("Server.Port is required")
+	}
+	if c.Server.GRPCPort == "" {
+		return fmt.Errorf("Server.GRPCPort is required")
+	}
+	if c.Server.Env == "" {
+		return fmt.Errorf("Server.Env is required")
+	}
+	if c.Server.Env == "production" {
+		if c.OAuth.Google.ClientID == "" || c.OAuth.Google.ClientSecret == "" || c.OAuth.Yandex.ClientID == "" || c.OAuth.Yandex.ClientSecret == "" {
+			return fmt.Errorf("OAuth credentials required in production")
+		}
+	}
+	if c.OAuth.Google.RedirectURL == "" {
+		c.OAuth.Google.RedirectURL = "http://localhost:" + c.Server.Port + "/auth/google/callback"
 	}
 	return nil
 }

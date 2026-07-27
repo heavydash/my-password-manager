@@ -22,6 +22,7 @@ const (
 	AuthService_Register_FullMethodName      = "/gophkeeper.AuthService/Register"
 	AuthService_LoginPassword_FullMethodName = "/gophkeeper.AuthService/LoginPassword"
 	AuthService_LoginOAuth_FullMethodName    = "/gophkeeper.AuthService/LoginOAuth"
+	AuthService_GetOAuthURL_FullMethodName   = "/gophkeeper.AuthService/GetOAuthURL"
 )
 
 // AuthServiceClient is the client API for AuthService service.
@@ -36,6 +37,8 @@ type AuthServiceClient interface {
 	LoginPassword(ctx context.Context, in *LoginPasswordRequest, opts ...grpc.CallOption) (*LoginResponse, error)
 	// LoginOAuth — логин через OAuth
 	LoginOAuth(ctx context.Context, in *LoginOAuthRequest, opts ...grpc.CallOption) (*LoginResponse, error)
+	// GetOAuthURL — получить URL для открытия в браузере
+	GetOAuthURL(ctx context.Context, in *GetOAuthURLRequest, opts ...grpc.CallOption) (*GetOAuthURLResponse, error)
 }
 
 type authServiceClient struct {
@@ -76,6 +79,16 @@ func (c *authServiceClient) LoginOAuth(ctx context.Context, in *LoginOAuthReques
 	return out, nil
 }
 
+func (c *authServiceClient) GetOAuthURL(ctx context.Context, in *GetOAuthURLRequest, opts ...grpc.CallOption) (*GetOAuthURLResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetOAuthURLResponse)
+	err := c.cc.Invoke(ctx, AuthService_GetOAuthURL_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServiceServer is the server API for AuthService service.
 // All implementations must embed UnimplementedAuthServiceServer
 // for forward compatibility.
@@ -88,6 +101,8 @@ type AuthServiceServer interface {
 	LoginPassword(context.Context, *LoginPasswordRequest) (*LoginResponse, error)
 	// LoginOAuth — логин через OAuth
 	LoginOAuth(context.Context, *LoginOAuthRequest) (*LoginResponse, error)
+	// GetOAuthURL — получить URL для открытия в браузере
+	GetOAuthURL(context.Context, *GetOAuthURLRequest) (*GetOAuthURLResponse, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }
 
@@ -106,6 +121,9 @@ func (UnimplementedAuthServiceServer) LoginPassword(context.Context, *LoginPassw
 }
 func (UnimplementedAuthServiceServer) LoginOAuth(context.Context, *LoginOAuthRequest) (*LoginResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method LoginOAuth not implemented")
+}
+func (UnimplementedAuthServiceServer) GetOAuthURL(context.Context, *GetOAuthURLRequest) (*GetOAuthURLResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetOAuthURL not implemented")
 }
 func (UnimplementedAuthServiceServer) mustEmbedUnimplementedAuthServiceServer() {}
 func (UnimplementedAuthServiceServer) testEmbeddedByValue()                     {}
@@ -182,6 +200,24 @@ func _AuthService_LoginOAuth_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_GetOAuthURL_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetOAuthURLRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).GetOAuthURL(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_GetOAuthURL_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).GetOAuthURL(ctx, req.(*GetOAuthURLRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuthService_ServiceDesc is the grpc.ServiceDesc for AuthService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -200,6 +236,10 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "LoginOAuth",
 			Handler:    _AuthService_LoginOAuth_Handler,
+		},
+		{
+			MethodName: "GetOAuthURL",
+			Handler:    _AuthService_GetOAuthURL_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
