@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package gophkeeper;
+
+option go_package = "gophkeeper/server/proto/gophkeeper";
+
+// AuthService — сервис аутентификации
+service AuthService {
+  // Register — регистрация нового пользователя
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+
+  // LoginPassword — логин по email + пароль
+  rpc LoginPassword(LoginPasswordRequest) returns (LoginResponse);
+
+  // LoginOAuth — логин через OAuth
+  rpc LoginOAuth(LoginOAuthRequest) returns (LoginResponse);
+}
+
+
+message RegisterRequest {
+  string email    = 1;
+  string password = 2;
+}
+
+message RegisterResponse {
+  string user_id = 1;
+  string message = 2;   // "user registered successfully"
+}
+
+message LoginPasswordRequest {
+  string email    = 1;
+  string password = 2;
+}
+
+message LoginOAuthRequest {
+  string provider = 1;   // "google"
+  string code     = 2;   // authorization code
+}
+
+message LoginResponse {
+  string token   = 1;
+  string user_id = 2;
+  string message = 3;   // "login successfully"
+}

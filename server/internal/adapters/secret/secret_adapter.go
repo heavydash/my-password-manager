@@ -4,19 +4,25 @@ import (
 	"context"
 	"fmt"
 	"gophkeeper/server/internal/domain"
+	"gophkeeper/server/internal/logger"
 	"gophkeeper/server/internal/ports"
 )
 
 type SecretAdapter struct {
 	storage ports.SecretStoragePort
+	logger  logger.Logger
 }
 
-func NewSecretAdapter(storage ports.SecretStoragePort) *SecretAdapter {
+func NewSecretAdapter(storage ports.SecretStoragePort, log logger.Logger) *SecretAdapter {
 	if storage == nil {
 		panic("storage is nil")
 	}
+	if log == nil {
+		panic("logger is nil")
+	}
 	return &SecretAdapter{
 		storage: storage,
+		logger:  log,
 	}
 }
 
@@ -45,6 +51,10 @@ func (a *SecretAdapter) GetByUserID(ctx context.Context, userID string) ([]*port
 	}
 
 	return secrets, nil
+}
+
+func (a *SecretAdapter) GetSecret(ctx context.Context, id, userID string) (*ports.Secret, error) {
+	return a.storage.GetSecret(ctx, id, userID)
 }
 
 func (a *SecretAdapter) Delete(ctx context.Context, userID, secretID string) error {
