@@ -3,9 +3,12 @@ package main
 import (
 	"context"
 	"database/sql"
-	"github.com/joho/godotenv"
+	"github.com/gin-gonic/gin"
 	"gophkeeper/server/internal/adapters/auth"
+	"gophkeeper/server/internal/adapters/protocol/rest/handler"
+	"gophkeeper/server/internal/adapters/protocol/rest/middleware"
 	"gophkeeper/server/internal/adapters/storage/postgres"
+	"gophkeeper/server/internal/config"
 	"gophkeeper/server/internal/domain"
 	"log"
 	"net/http"
@@ -18,19 +21,11 @@ import (
 func main() {
 	log.Println("GophKeeper Server starting...")
 
-	// Загружаем .env файл
-	if err := godotenv.Load(); err != nil {
-		log.Println("Warning: No .env file found, using system environment variables")
-	}
+	// Загружаем и валидируем конфиг
+	cfg := config.Load()
 
-	// Читаем DSN
-	dbDSN := os.Getenv("DB_DSN")
-	if dbDSN == "" {
-		log.Fatal("DB_DSN environment variable is not set. Check your .env file")
-	}
-
-	// Подключаемся к БД
-	db, err := sql.Open("postgres", dbDSN)
+	// Подключаемся к БД через конфиг
+	db, err := sql.Open("postgres", cfg.Database.DSN)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
@@ -45,60 +40,65 @@ func main() {
 	// Создаем Storage
 	storage := postgres.NewStorage(db)
 
-	// Auth
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		jwtSecret = "change-in-prod"
-	}
-
-	passwordAdapter := auth.NewPasswordAdapter(storage, jwtSecret)
+	// Создаем адаптеры
+	passwordAdapter := auth.NewPasswordAdapter(storage, cfg.JWT.Secret)
 	authUserCase := domain.NewAuthUseCase(passwordAdapter)
-
-	// Тестовая регистрация
-	ctx := context.Background()
-	userID, err := authUserCase.Register(ctx, "newuser@example.com", "pass123")
-	if err != nil {
-		log.Printf("Failed to register user: %v", err)
-	} else {
-		log.Printf("User registered with ID: %v", userID)
-	}
 
 	log.Println("Auth User Case and password adapter initialized")
 
-	// HTTP + pprof
-	mux := http.NewServeMux()
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
+	// Настройка Gin
+	if gin.Mode() == gin.DebugMode {
+		log.Println("Running in DEBUG mode. Use GIN_MODE=release for production")
+	} else {
+		gin.SetMode(gin.ReleaseMode)
+	}
 
+	// Роуты
+	r := gin.Default()
+
+	// Публичные роуты
+	pub := r.Group("/")
+	pub.POST("/register", handler.Register(authUserCase))
+	pub.POST("/login", handler.Login(authUserCase))
+
+	// Защищенные роуты
+	protect := r.Group("/")
+	protect.Use(middleware.AuthMiddleware(passwordAdapter.ValidateJWT))
+	protect.GET("/profile", handler.Profile())
+
+	// HTTP + pprof
 	srv := &http.Server{
-		Addr:    ":8080",
-		Handler: mux,
+		Addr:    ":" + cfg.Server.Port,
+		Handler: r,
 	}
 
 	pprofSrv := &http.Server{
-		Addr:    ":6060",
+		Addr:    ":" + cfg.Pprof.Port,
 		Handler: nil,
 	}
+
+	log.Printf("REST listening on: http://localhost:%s", cfg.Server.Port)
+	log.Printf("pprof available at http://localhost:%s/debug/pprof", cfg.Pprof.Port)
+
+	// Запуск основного сервера
 	go func() {
-		log.Println("REST listening on :8080")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen: %s\n", err)
 		}
 	}()
 
+	// Запуск Pprof
 	go func() {
-		log.Println("pprof available at :6060/debug/pprof")
 		if err := pprofSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatal(err)
+			log.Printf("pprof server error: %s", err)
 		}
 	}()
 
 	// Graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
 
+	<-quit
 	log.Println("Shutting down server...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

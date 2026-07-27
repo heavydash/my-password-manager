@@ -3,6 +3,8 @@ package auth
 import (
 	"context"
 	"encoding/base64"
+	"errors"
+	"fmt"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/argon2"
 	"gophkeeper/server/internal/domain"
@@ -63,7 +65,7 @@ func (a *passwordAdapter) AuthenticateOAuth(ctx context.Context, provider, code 
 }
 
 func (a *passwordAdapter) GetUserByID(ctx context.Context, id string) (ports.User, error) {
-	domainUser, err := a.GetUserByID(ctx, id)
+	domainUser, err := a.storage.GetUserByID(ctx, id)
 	if err != nil {
 		return ports.User{}, err
 	}
@@ -83,11 +85,43 @@ func (a *passwordAdapter) checkPassword(password, hashed string) bool {
 }
 
 func (a *passwordAdapter) generateJWT(userID string) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"userID": userID,
-		"exp":    time.Now().Add(24 * time.Hour).Unix(),
-	})
+	now := time.Now()
+
+	claims := jwt.MapClaims{
+		"user_ID": userID,
+		"exp":     now.Add(15 * time.Minute).Unix(), // Ограничение
+		"iat":     now.Unix(),                       // issued at - когда выдан
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(a.jwtSecret)
+}
+
+func (a *passwordAdapter) ValidateJWT(tokenString string) (string, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		// Защита для HS256
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return a.jwtSecret, nil
+	})
+
+	if err != nil {
+		if errors.Is(err, jwt.ErrTokenExpired) {
+			return "", domain.ErrTokenExpired
+		}
+		return "", domain.ErrTokenInvalid
+	}
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		for _, key := range []string{"user_id", "userID", "user_ID", "userid"} {
+			if id, ok := claims[key].(string); ok && id != "" {
+				return id, nil
+			}
+		}
+	}
+
+	return "", domain.ErrTokenInvalid
 }
 
 func (a *passwordAdapter) hashPassword(password string) string {
