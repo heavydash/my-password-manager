@@ -1,3 +1,4 @@
+// Package main содержит root команду CLI клиента GophKeeper.
 package main
 
 import (
@@ -9,7 +10,27 @@ import (
 	_ "gophkeeper/client/cmd/gophkeeper/secret"
 )
 
-// RootCmd
+// RootCmd — корневая команда CLI.
+//
+// Использование:
+//
+//	gophkeeper [command]
+//
+// Доступные команды:
+//   - login      Вход в систему
+//   - logout     Выход из системы
+//   - register   Регистрация нового пользователя
+//   - secret     Управление секретами
+//
+// Примеры:
+//
+//	gophkeeper --help
+//	gophkeeper login --email user@example.com --password mypass
+//	gophkeeper secret add --title "My Password" --type password
+//	gophkeeper secret list
+//	gophkeeper secret get --id <secret-id>
+//	gophkeeper secret delete --id <secret-id>
+//	gophkeeper logout
 var RootCmd = &cobra.Command{
 	Use:   "gophkeeper",
 	Short: "GophKeeper - secure password and secret manager",
