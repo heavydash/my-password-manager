@@ -1,19 +1,38 @@
+// Package ports содержит контракты (интерфейсы) между слоями приложения.
+//
+// Все зависимости идут от domain/usecases → ports → adapters.
 package ports
 
 import (
 	"context"
 )
 
+// AuthPort — основной порт аутентификации.
+//
+// Реализуется адаптерами: passwordAdapter и OAuthAdapter.
 type AuthPort interface {
+
+	// Register регистрирует нового пользователя.
+	Register(ctx context.Context, email, password string) (string, error)
+	// LoginPassword выполняет вход по email и паролю.
+	LoginPassword(ctx context.Context, email, password string) (token string, userID string, err error)
+	// CreateUser создаёт пользователя в хранилище.
 	CreateUser(ctx context.Context, user User) (string, error)
+	// AuthenticatePassword выполняет проверку email + пароль.
 	AuthenticatePassword(ctx context.Context, email, password string) (token string, userID string, err error)
+	// GetUserByID возвращает пользователя по ID.
 	GetUserByID(ctx context.Context, id string) (User, error)
+	// ValidateJWT проверяет JWT-токен и возвращает userID.
 	ValidateJWT(tokenString string) (string, error)
-
-	// Новые OAuth-методы
-	GetOAuthURL(provider string) (authURL, state string, err error)
-	HandleCallback(provider, code, state string) (oneTimeCode string, err error)
-	AuthenticateOAuth(ctx context.Context, oneTimeCode string) (token string, err error)
-
+	// GenerateJWT генерирует новый JWT-токен.
 	GenerateJWT(userID string) (string, error)
+	// GetOAuthURL возвращает URL для редиректа на провайдера и state.
+	GetOAuthURL(provider string) (authURL, state string, err error)
+	// HandleCallback обрабатывает callback от OAuth-провайдера.
+	// HandleOAuthCallback обрабатывает callback от OAuth-провайдера.
+	// Возвращает временный код для последующего обмена на JWT.
+	HandleCallback(provider, code, state string) (tempCode string, err error)
+	HandleOAuthCallback(provider, code, state string) (string, error)
+	// AuthenticateOAuth завершает OAuth-flow по временному коду.
+	AuthenticateOAuth(ctx context.Context, code string) (token string, err error)
 }
